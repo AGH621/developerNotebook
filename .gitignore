@@ -12,5 +12,10 @@ wheels/
 # Virtual environments
 .venv/
 
+# Environment
+.env
+
 # Project data
 Developer_Commands.docx
+*.db
+*.sqlite
