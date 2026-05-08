@@ -14,7 +14,12 @@
   </td>
   <td class="entry-row__command">
     <code class="entry-row__code">{{ entry.command }}</code>
-    <button type="button" class="entry-copy" data-command="{{ entry.command|e }}">[copy]</button>
+    <button
+      type="button"
+      class="entry-copy"
+      data-command="{{ entry.command|e }}"
+      aria-label="Copy command to clipboard"
+    >[copy]</button>
   </td>
   <td class="entry-row__actions">
     <button

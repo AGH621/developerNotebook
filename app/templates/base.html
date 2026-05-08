@@ -22,5 +22,75 @@
   <main class="site-main{% block main_extra_class %}{% endblock %}">
     {% block content %}{% endblock %}
   </main>
+  <script>
+  (function () {
+    var COPIED_MS = 1600;
+
+    function copyText(text) {
+      if (navigator.clipboard && window.isSecureContext) {
+        return navigator.clipboard.writeText(text);
+      }
+      return new Promise(function (resolve, reject) {
+        var ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          if (document.execCommand("copy")) resolve();
+          else reject(new Error("execCommand copy failed"));
+        } catch (err) {
+          reject(err);
+        }
+        document.body.removeChild(ta);
+      });
+    }
+
+    document.body.addEventListener("click", function (evt) {
+      var btn = evt.target && evt.target.closest && evt.target.closest(".entry-copy");
+      if (!btn || btn.disabled) return;
+
+      var text = btn.getAttribute("data-command");
+      if (text === null || text === "") {
+        var row = btn.closest(".entry-row");
+        var code = row && row.querySelector(".entry-row__code");
+        text = code ? code.textContent.replace(/\u00a0/g, " ").trim() : "";
+      }
+      if (text === null || text === "") return;
+
+      evt.preventDefault();
+      var prevLabel = (btn.textContent || "").trim();
+      var prevAria = btn.getAttribute("aria-label");
+      btn.disabled = true;
+
+      copyText(text)
+        .then(function () {
+          btn.classList.add("is-copied");
+          btn.textContent = "Copied!";
+          btn.setAttribute("aria-label", "Command copied to clipboard");
+          window.setTimeout(function () {
+            btn.textContent = prevLabel;
+            btn.classList.remove("is-copied");
+            if (prevAria) btn.setAttribute("aria-label", prevAria);
+            else btn.removeAttribute("aria-label");
+            btn.disabled = false;
+          }, COPIED_MS);
+        })
+        .catch(function () {
+          btn.textContent = "Failed";
+          btn.setAttribute("aria-label", "Copy failed");
+          window.setTimeout(function () {
+            btn.textContent = prevLabel;
+            if (prevAria) btn.setAttribute("aria-label", prevAria);
+            else btn.removeAttribute("aria-label");
+            btn.disabled = false;
+          }, 1800);
+        });
+    });
+  })();
+  </script>
 </body>
 </html>
