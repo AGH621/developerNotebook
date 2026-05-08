@@ -7,7 +7,6 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
 from app.database import Base, engine
 
@@ -18,7 +17,6 @@ logging.basicConfig(
 logger = logging.getLogger("devnotebook")
 
 _APP_DIR = Path(__file__).resolve().parent
-templates = Jinja2Templates(directory=str(_APP_DIR / "templates"))
 
 
 @asynccontextmanager
@@ -34,9 +32,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(_APP_DIR / "static")), name="static")
 
-# Route routers are registered in Phases 2–5.
-# from app.routes import entries, pages, sections, topics
-# app.include_router(pages.router)
-# app.include_router(topics.router)
-# app.include_router(sections.router)
-# app.include_router(entries.router)
+# Route routers (topics, sections, entries added in later phases).
+from app.routes import pages
+
+app.include_router(pages.router)

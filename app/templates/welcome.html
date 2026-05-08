@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Welcome — Developer Notebook{% endblock %}
+{% block content %}
+<section class="welcome">
+  <h1>Welcome</h1>
+  <p class="welcome__intro">Pick how you want to start your notebook.</p>
+
+  {% if error %}
+  <p class="auth-panel__error" role="alert">{{ error }}</p>
+  {% endif %}
+
+  <div class="welcome-cards">
+    <form method="post" action="/welcome" class="welcome-card-form">
+      <input type="hidden" name="choice" value="template">
+      <button type="submit" class="welcome-card">
+        <span class="welcome-card__title">Start with Developer Commands template</span>
+        <span class="welcome-card__body">Loads a cheat sheet covering Git, shell, databases, frameworks, CLIs, and more.</span>
+      </button>
+    </form>
+    <form method="post" action="/welcome" class="welcome-card-form">
+      <input type="hidden" name="choice" value="blank">
+      <button type="submit" class="welcome-card">
+        <span class="welcome-card__title">Start with a blank notebook</span>
+        <span class="welcome-card__body">No topics yet — you can add topics from your home page when it is ready.</span>
+      </button>
+    </form>
+  </div>
+</section>
+{% endblock %}

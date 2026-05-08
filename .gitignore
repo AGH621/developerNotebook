@@ -16,6 +16,5 @@ wheels/
 .env
 
 # Project data
-Developer_Commands.docx
 *.db
 *.sqlite

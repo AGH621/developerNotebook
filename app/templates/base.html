@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Developer Notebook{% endblock %}</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js" defer></script>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <nav class="site-nav">
+    <a href="/" class="site-nav__brand">Developer Notebook</a>
+    {% if user %}
+    <span class="site-nav__user">{{ user.username }}</span>
+    <form method="post" action="/logout" class="site-nav__logout">
+      <button type="submit">Log out</button>
+    </form>
+    {% endif %}
+  </nav>
+  <main class="site-main">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

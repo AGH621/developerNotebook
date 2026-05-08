@@ -1,0 +1,147 @@
+/* Phase 3 / 6 — minimal layout; expand in Phase 6 */
+
+:root {
+  --color-bg: #f6f7f9;
+  --color-text: #1a1a1a;
+  --color-muted: #5c6370;
+  --color-border: #d8dee9;
+  --color-card: #fff;
+  --color-error: #b71c1c;
+  --space-1: 0.5rem;
+  --space-2: 1rem;
+  --space-3: 1.5rem;
+  --radius: 8px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-card);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.site-nav__brand {
+  font-weight: 600;
+  color: inherit;
+  text-decoration: none;
+  margin-right: auto;
+}
+
+.site-nav__logout {
+  margin: 0;
+}
+
+.site-main {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: var(--space-3);
+}
+
+.auth-panel {
+  max-width: 22rem;
+  margin: var(--space-3) auto;
+}
+
+.welcome {
+  max-width: 42rem;
+  margin: var(--space-3) auto;
+}
+
+.welcome__intro {
+  color: var(--color-muted);
+  margin-top: 0;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.auth-form__field span {
+  display: block;
+  font-size: 0.9rem;
+  margin-bottom: var(--space-1);
+}
+
+.auth-form__field input {
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.auth-form__submit {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: #fff;
+  cursor: pointer;
+}
+
+.auth-panel__error {
+  color: var(--color-error);
+  font-size: 0.95rem;
+}
+
+.auth-panel__footer {
+  font-size: 0.95rem;
+  color: var(--color-muted);
+}
+
+.welcome-cards {
+  display: grid;
+  gap: var(--space-2);
+  max-width: 36rem;
+  margin: var(--space-3) auto 0;
+}
+
+.welcome-card-form {
+  margin: 0;
+}
+
+.welcome-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  width: 100%;
+  text-align: left;
+  padding: var(--space-3);
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.welcome-card:hover {
+  border-color: var(--color-muted);
+}
+
+.welcome-card__title {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.welcome-card__body {
+  font-size: 0.95rem;
+  color: var(--color-muted);
+}
