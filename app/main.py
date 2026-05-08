@@ -29,13 +29,37 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(lifespan=lifespan)
-app.mount("/static", StaticFiles(directory=str(_APP_DIR / "static")), name="static")
+def create_app(*, enable_lifespan: bool = True) -> FastAPI:
+    """Build the FastAPI application (routers, static files, optional DB lifespan).
 
-# Route routers.
-from app.routes import entries, pages, sections, topics
+    Parameters
+    ----------
+    enable_lifespan : bool
+        When ``True`` (production), run ``create_all`` on the process SQLite
+        engine at startup. When ``False`` (tests), skip startup DB side effects
+        so dependency overrides can use an isolated in-memory session.
 
-app.include_router(pages.router)
-app.include_router(topics.router)
-app.include_router(sections.router)
-app.include_router(entries.router)
+    Returns
+    -------
+    FastAPI
+        Configured application instance.
+    """
+    import app.models  # noqa: F401 — registers models on Base.metadata
+
+    if enable_lifespan:
+        application = FastAPI(lifespan=lifespan)
+    else:
+        application = FastAPI()
+
+    application.mount("/static", StaticFiles(directory=str(_APP_DIR / "static")), name="static")
+
+    from app.routes import entries, pages, sections, topics
+
+    application.include_router(pages.router)
+    application.include_router(topics.router)
+    application.include_router(sections.router)
+    application.include_router(entries.router)
+    return application
+
+
+app = create_app(enable_lifespan=True)

@@ -12,7 +12,38 @@ Starter notebook data loaded from the Word cheatsheet.
 
 from __future__ import annotations
 
+from docx.opc.exceptions import PackageNotFoundError
+
 from app.docx_seed import parse_developer_commands_docx
 
-# Resolved at import time from ``Developer_Commands.docx`` (or ``Developer Commands.docx``)
-STARTER_DATA: list[dict] = parse_developer_commands_docx()
+# Used when no Word file is present (minimal checkout, CI, tests).
+_FALLBACK_STARTER_DATA: list[dict] = [
+    {
+        "name": "Git",
+        "sections": [
+            {
+                "name": "Branches",
+                "entries": [
+                    {"description": "Delete a local branch", "command": "git branch -d <branch>"},
+                ],
+            },
+        ],
+    },
+    {
+        "name": "Flask",
+        "sections": [
+            {
+                "name": None,
+                "entries": [
+                    {"description": "Run dev server", "command": "flask run --debug"},
+                ],
+            },
+        ],
+    },
+]
+
+try:
+    # Resolved at import time from ``Developer_Commands.docx`` when available.
+    STARTER_DATA: list[dict] = parse_developer_commands_docx()
+except (FileNotFoundError, PackageNotFoundError):
+    STARTER_DATA = _FALLBACK_STARTER_DATA
