@@ -1,0 +1,30 @@
+<article
+  class="topic-card"
+  id="topic-card-{{ topic.id }}"
+  data-topic-id="{{ topic.id|string }}"
+>
+  <div class="topic-card__toolbar">
+    <button type="button" class="topic-card__drag" aria-label="Reorder topics" title="Drag to reorder">⋮⋮</button>
+    <div class="topic-card__body">
+      <a class="topic-card__title" href="/topic/{{ topic.slug }}">{{ topic.name }}</a>
+      <p class="topic-card__meta">{{ topic.sections|length }} section{% if topic.sections|length != 1 %}s{% endif %}</p>
+    </div>
+    <div class="topic-card__actions">
+      <button
+        type="button"
+        class="topic-card__btn"
+        hx-get="/topics/{{ topic.id }}/edit"
+        hx-target="#topic-card-{{ topic.id }}"
+        hx-swap="outerHTML"
+      >Rename</button>
+      <button
+        type="button"
+        class="topic-card__btn topic-card__btn--danger"
+        hx-delete="/topics/{{ topic.id }}"
+        hx-target="#topic-card-{{ topic.id }}"
+        hx-swap="delete"
+        hx-confirm="Delete this topic and all of its sections?"
+      >Delete</button>
+    </div>
+  </div>
+</article>

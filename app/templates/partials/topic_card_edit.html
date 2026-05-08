@@ -1,0 +1,27 @@
+<article
+  class="topic-card topic-card--editing"
+  id="topic-card-{{ topic.id }}"
+  data-topic-id="{{ topic.id|string }}"
+>
+  <form
+    class="topic-card__edit-form"
+    hx-put="/topics/{{ topic.id }}"
+    hx-target="#topic-card-{{ topic.id }}"
+    hx-swap="outerHTML"
+  >
+    <label class="topic-card__edit-label">
+      <span class="sr-only">Topic name</span>
+      <input type="text" name="name" value="{{ topic.name }}" maxlength="256" autofocus>
+    </label>
+    <div class="topic-card__edit-actions">
+      <button type="submit" class="topic-card__btn">Save</button>
+      <button
+        type="button"
+        class="topic-card__btn"
+        hx-get="/topics/{{ topic.id }}/card"
+        hx-target="#topic-card-{{ topic.id }}"
+        hx-swap="outerHTML"
+      >Cancel</button>
+    </div>
+  </form>
+</article>

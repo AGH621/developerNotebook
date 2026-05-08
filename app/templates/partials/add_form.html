@@ -1,0 +1,20 @@
+{# Reusable inline POST form (topics, later sections/entries). Expected context: action, target, label, placeholder, submit_label, swap (optional). #}
+<form
+  class="add-form"
+  hx-post="{{ action }}"
+  hx-target="{{ target }}"
+  hx-swap="{{ swap|default('beforeend') }}"
+  hx-on::after-request="if(event.detail.successful && event.target === this) this.reset()"
+>
+  <label class="add-form__label">
+    <span class="sr-only">{{ label }}</span>
+    <input
+      type="text"
+      name="name"
+      placeholder="{{ placeholder }}"
+      maxlength="256"
+      autocomplete="off"
+    >
+  </label>
+  <button type="submit" class="add-form__submit">{{ submit_label }}</button>
+</form>

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Form, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from starlette.responses import Response
 
 from app.auth import (
@@ -27,6 +27,41 @@ from app.templating import templates
 
 router = APIRouter()
 auth_log = logging.getLogger("devnotebook.auth")
+
+
+@router.get("/")
+async def home(
+    request: Request,
+    user: User = Depends(require_auth),
+    db: Session = Depends(get_db),
+):
+    """List the authenticated user's topics ordered for the home grid.
+
+    Parameters
+    ----------
+    request : Request
+        Incoming HTTP request.
+    user : User
+        Session user from :func:`app.auth.require_auth`.
+    db : Session
+        Database session from dependency injection.
+
+    Returns
+    -------
+    TemplateResponse
+        Renders ``home.html`` with eagerly loaded section counts.
+    """
+    topics = db.scalars(
+        select(Topic)
+        .where(Topic.user_id == user.id)
+        .options(selectinload(Topic.sections))
+        .order_by(Topic.display_order.asc(), Topic.id.asc()),
+    ).all()
+    return templates.TemplateResponse(
+        request,
+        "home.html",
+        {"user": user, "topics": topics},
+    )
 
 
 def _clear_session_cookie(response: Response) -> None:

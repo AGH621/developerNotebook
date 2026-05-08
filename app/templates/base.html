@@ -19,7 +19,7 @@
     </form>
     {% endif %}
   </nav>
-  <main class="site-main">
+  <main class="site-main{% block main_extra_class %}{% endblock %}">
     {% block content %}{% endblock %}
   </main>
 </body>

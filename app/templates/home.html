@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Topics — Developer Notebook{% endblock %}
+{% block main_extra_class %} site-main--home{% endblock %}
+{% block content %}
+<div class="home-shell">
+  <header class="home-header">
+    <h1>Topics</h1>
+    <div class="home-header__actions">
+      {% set action = "/topics" %}
+      {% set target = "#topic-grid" %}
+      {% set label = "New topic name" %}
+      {% set placeholder = "Topic name" %}
+      {% set submit_label = "+ Topic" %}
+      {% include "partials/add_form.html" %}
+    </div>
+  </header>
+
+  <div id="topic-grid" class="topic-grid">
+    {% for topic in topics %}
+      {% include "partials/topic_card.html" %}
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+(function () {
+  function bindTopicSortable() {
+    var grid = document.getElementById("topic-grid");
+    if (!grid || typeof Sortable === "undefined") return;
+    if (grid._sortableTopic) {
+      try { grid._sortableTopic.destroy(); } catch (e) {}
+    }
+    grid._sortableTopic = new Sortable(grid, {
+      animation: 150,
+      handle: ".topic-card__drag",
+      draggable: ".topic-card",
+      onEnd: function () {
+        var ids = [].map.call(grid.querySelectorAll(".topic-card"), function (el) {
+          return el.getAttribute("data-topic-id");
+        });
+        if (!ids.length) return;
+        var body = new URLSearchParams();
+        body.set("topic_order", ids.join(","));
+        fetch("/topics/reorder", {
+          method: "PUT",
+          body: body,
+          credentials: "same-origin",
+          headers: { Accept: "application/json" },
+        }).catch(function () {});
+      },
+    });
+  }
+  document.addEventListener("DOMContentLoaded", bindTopicSortable);
+  document.body.addEventListener("htmx:afterSwap", bindTopicSortable);
+})();
+</script>
+{% endblock %}

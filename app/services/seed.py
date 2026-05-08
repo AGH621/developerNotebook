@@ -3,64 +3,14 @@
 from __future__ import annotations
 
 import logging
-import re
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Entry, Section, Topic
 from app.seed_data import STARTER_DATA
+from app.slug import allocate_topic_slug as _allocate_slug_for_user
 
 logger = logging.getLogger("devnotebook.services.seed")
-
-
-def _slug_base(name: str) -> str:
-    """Normalize a topic title to a hyphenated slug stem.
-
-    Parameters
-    ----------
-    name : str
-        Topic display title.
-
-    Returns
-    -------
-    str
-        Lowercase slug fragment; literal ``topic`` when nothing alphanumeric remains.
-    """
-    s = name.strip().lower()
-    s = re.sub(r"[^a-z0-9]+", "-", s)
-    s = s.strip("-")
-    return s or "topic"
-
-
-def _allocate_slug(session: Session, user_id: int, topic_name: str) -> str:
-    """Return a slug for ``topic_name`` that is unique for ``user_id``.
-
-    Parameters
-    ----------
-    session : Session
-        Open ORM session for collision checks.
-    user_id : int
-        Owner scope for uniqueness.
-    topic_name : str
-        Source title used to build the base slug.
-
-    Returns
-    -------
-    str
-        Unused slug, appending ``-2``, ``-3``, … if the base is taken.
-    """
-    base = _slug_base(topic_name)
-    candidate = base
-    n = 2
-    while True:
-        clash = session.scalars(
-            select(Topic.id).where(Topic.user_id == user_id, Topic.slug == candidate),
-        ).first()
-        if clash is None:
-            return candidate
-        candidate = f"{base}-{n}"
-        n += 1
 
 
 def populate_starter_data(db: Session, user_id: int) -> dict[str, int]:
@@ -86,7 +36,7 @@ def populate_starter_data(db: Session, user_id: int) -> dict[str, int]:
     n_topics = n_sections = n_entries = 0
     for t_order, topic_blob in enumerate(STARTER_DATA):
         name = str(topic_blob["name"])
-        slug = _allocate_slug(db, user_id, name)
+        slug = _allocate_slug_for_user(db, user_id, name)
         topic = Topic(user_id=user_id, name=name, slug=slug, display_order=t_order)
         db.add(topic)
         db.flush()
