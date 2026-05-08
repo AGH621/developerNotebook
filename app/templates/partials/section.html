@@ -1,0 +1,82 @@
+<section
+  class="topic-section"
+  id="section-{{ section.id }}"
+  data-section-id="{{ section.id|string }}"
+>
+  <header class="topic-section__header">
+    <div class="topic-section__toolbar">
+      <button
+        type="button"
+        class="topic-section__drag"
+        aria-label="Reorder sections"
+        title="Drag to reorder"
+      >⋮⋮</button>
+      <div class="topic-section__heading">
+        {% if not hide_section_chrome %}
+        <h2 class="topic-section__title" id="section-heading-{{ section.id }}">
+          {% if section.name %}{{ section.name }}{% else %}Default{% endif %}
+        </h2>
+        {% endif %}
+        <div class="topic-section__actions">
+          <button
+            type="button"
+            class="topic-section__btn"
+            hx-get="/sections/{{ section.id }}/edit"
+            hx-target="#section-{{ section.id }}"
+            hx-swap="outerHTML"
+          >Edit section</button>
+          <button
+            type="button"
+            class="topic-section__btn topic-section__btn--danger"
+            hx-delete="/sections/{{ section.id }}"
+            hx-target="#section-{{ section.id }}"
+            hx-swap="delete"
+            hx-confirm="Delete this section and all of its entries?"
+          >Delete</button>
+        </div>
+      </div>
+    </div>
+    {% if section.notes %}
+    <p class="topic-section__notes">{{ section.notes }}</p>
+    {% endif %}
+  </header>
+
+  <div class="topic-section__body">
+    <div class="entry-table-wrap">
+      <table
+        class="entry-table"
+        {% if not hide_section_chrome %}
+        aria-labelledby="section-heading-{{ section.id }}"
+        {% else %}
+        aria-label="Commands in this section"
+        {% endif %}
+      >
+        <thead>
+          <tr>
+            <th class="entry-table__col-desc" scope="col">Description</th>
+            <th class="entry-table__col-cmd" scope="col">Command</th>
+            <th class="entry-table__col-actions" scope="col"><span class="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody
+          id="entries-tbody-{{ section.id }}"
+          class="entry-tbody"
+          data-section-id="{{ section.id|string }}"
+        >
+          {% for entry in section.entries|sort(attribute='display_order') %}
+            {% include "partials/entry_row.html" %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="topic-section__add-entry">
+      {% set variant = 'entry' %}
+      {% set action = "/sections/" ~ section.id ~ "/entries" %}
+      {% set target = "#entries-tbody-" ~ section.id|string %}
+      {% set swap = 'beforeend' %}
+      {% set submit_label = "+ Add Entry" %}
+      {% include "partials/add_form.html" %}
+    </div>
+  </div>
+</section>

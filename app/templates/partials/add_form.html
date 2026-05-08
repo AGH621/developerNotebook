@@ -1,11 +1,33 @@
-{# Reusable inline POST form (topics, later sections/entries). Expected context: action, target, label, placeholder, submit_label, swap (optional). #}
+{# Reusable inline POST form (topics, sections, entries). Context: action, target, submit_label, swap (optional), variant (optional: "entry"). For non-entry: label, placeholder. For entry: desc_label, desc_placeholder, cmd_label, cmd_placeholder. #}
 <form
-  class="add-form"
+  class="add-form{% if variant == 'entry' %} add-form--entry{% endif %}"
   hx-post="{{ action }}"
   hx-target="{{ target }}"
   hx-swap="{{ swap|default('beforeend') }}"
   hx-on::after-request="if(event.detail.successful && event.target === this) this.reset()"
 >
+  {% if variant == 'entry' %}
+  <label class="add-form__label">
+    <span class="sr-only">{{ desc_label|default('Description') }}</span>
+    <input
+      type="text"
+      name="description"
+      placeholder="{{ desc_placeholder|default('What it does') }}"
+      maxlength="2048"
+      autocomplete="off"
+    >
+  </label>
+  <label class="add-form__label">
+    <span class="sr-only">{{ cmd_label|default('Command') }}</span>
+    <input
+      type="text"
+      name="command"
+      placeholder="{{ cmd_placeholder|default('Command') }}"
+      maxlength="2048"
+      autocomplete="off"
+    >
+  </label>
+  {% else %}
   <label class="add-form__label">
     <span class="sr-only">{{ label }}</span>
     <input
@@ -16,5 +38,6 @@
       autocomplete="off"
     >
   </label>
+  {% endif %}
   <button type="submit" class="add-form__submit">{{ submit_label }}</button>
 </form>

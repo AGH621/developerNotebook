@@ -32,8 +32,10 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(_APP_DIR / "static")), name="static")
 
-# Route routers (sections and entries wiring in Phase 5).
-from app.routes import pages, topics
+# Route routers.
+from app.routes import entries, pages, sections, topics
 
 app.include_router(pages.router)
 app.include_router(topics.router)
+app.include_router(sections.router)
+app.include_router(entries.router)

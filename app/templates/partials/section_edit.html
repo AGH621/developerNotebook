@@ -1,0 +1,35 @@
+<section
+  class="topic-section topic-section--editing"
+  id="section-{{ section.id }}"
+  data-section-id="{{ section.id|string }}"
+>
+  <form
+    class="topic-section__edit-form"
+    hx-put="/sections/{{ section.id }}"
+    hx-target="#section-{{ section.id }}"
+    hx-swap="outerHTML"
+  >
+    {% if not hide_section_chrome %}
+    <label class="topic-section__edit-field">
+      <span class="topic-section__edit-label">Section name</span>
+      <input type="text" name="name" value="{{ section.name or '' }}" maxlength="256" autofocus>
+    </label>
+    {% else %}
+    <input type="hidden" name="name" value="">
+    {% endif %}
+    <label class="topic-section__edit-field">
+      <span class="topic-section__edit-label">Notes (optional)</span>
+      <textarea name="notes" rows="3" maxlength="8000" placeholder="Warnings, tips, context…">{{ section.notes or '' }}</textarea>
+    </label>
+    <div class="topic-section__edit-actions">
+      <button type="submit" class="topic-section__btn">Save</button>
+      <button
+        type="button"
+        class="topic-section__btn"
+        hx-get="/sections/{{ section.id }}/view"
+        hx-target="#section-{{ section.id }}"
+        hx-swap="outerHTML"
+      >Cancel</button>
+    </div>
+  </form>
+</section>

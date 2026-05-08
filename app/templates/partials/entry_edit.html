@@ -1,0 +1,35 @@
+<tr
+  class="entry-row entry-row--editing"
+  id="entry-row-{{ entry.id }}"
+  data-entry-id="{{ entry.id|string }}"
+>
+  <td colspan="3" class="entry-row__edit-cell">
+    <form
+      class="entry-row__edit-inline"
+      hx-put="/entries/{{ entry.id }}"
+      hx-target="#entry-row-{{ entry.id }}"
+      hx-swap="outerHTML"
+    >
+      <div class="entry-row__edit-grid">
+        <label class="entry-row__edit-field">
+          <span class="entry-row__edit-label">Description</span>
+          <input type="text" name="description" value="{{ entry.description }}" maxlength="2048" autocomplete="off" autofocus>
+        </label>
+        <label class="entry-row__edit-field">
+          <span class="entry-row__edit-label">Command</span>
+          <input type="text" name="command" value="{{ entry.command }}" maxlength="2048" autocomplete="off">
+        </label>
+      </div>
+      <div class="entry-row__edit-actions">
+        <button type="submit" class="entry-row__btn">Save</button>
+        <button
+          type="button"
+          class="entry-row__btn"
+          hx-get="/entries/{{ entry.id }}/row"
+          hx-target="#entry-row-{{ entry.id }}"
+          hx-swap="outerHTML"
+        >Cancel</button>
+      </div>
+    </form>
+  </td>
+</tr>

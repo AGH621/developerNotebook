@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Form, Request, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -21,7 +21,8 @@ from app.auth import (
     verify_password,
 )
 from app.database import get_db
-from app.models import Topic, User
+from app.models import Section, Topic, User
+from app.routes.sections import _topic_context_flags
 from app.services.seed import populate_starter_data
 from app.templating import templates
 
@@ -61,6 +62,60 @@ async def home(
         request,
         "home.html",
         {"user": user, "topics": topics},
+    )
+
+
+@router.get("/topic/{slug}")
+async def topic_detail(
+    request: Request,
+    slug: str,
+    user: User = Depends(require_auth),
+    db: Session = Depends(get_db),
+):
+    """Show one topic with its sections and command entries.
+
+    Parameters
+    ----------
+    request : Request
+        Incoming HTTP request.
+    slug : str
+        URL slug for the topic (unique per user).
+    user : User
+        Authenticated owner from :func:`app.auth.require_auth`.
+    db : Session
+        Database session.
+
+    Returns
+    -------
+    TemplateResponse
+        Renders ``topic.html`` with eagerly loaded sections and entries.
+    Raises
+    ------
+    HTTPException
+        **404** when no topic matches the slug for this user.
+    """
+    topic = db.scalars(
+        select(Topic)
+        .where(Topic.user_id == user.id, Topic.slug == slug)
+        .options(
+            selectinload(Topic.sections).selectinload(Section.entries),
+        ),
+    ).first()
+    if topic is None:
+        raise HTTPException(status_code=404, detail="Topic not found")
+
+    sections = sorted(topic.sections, key=lambda s: (s.display_order, s.id))
+    hide_chrome, show_sidebar = _topic_context_flags(topic)
+    return templates.TemplateResponse(
+        request,
+        "topic.html",
+        {
+            "user": user,
+            "topic": topic,
+            "sections": sections,
+            "hide_section_chrome": hide_chrome,
+            "show_section_sidebar": show_sidebar,
+        },
     )
 
 

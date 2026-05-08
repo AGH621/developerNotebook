@@ -1,0 +1,36 @@
+<tr
+  class="entry-row"
+  id="entry-row-{{ entry.id }}"
+  data-entry-id="{{ entry.id|string }}"
+>
+  <td class="entry-row__description">
+    <button
+      type="button"
+      class="entry-row__drag"
+      aria-label="Reorder entries"
+      title="Drag to reorder"
+    >⋮⋮</button>
+    <span class="entry-row__description-text">{{ entry.description }}</span>
+  </td>
+  <td class="entry-row__command">
+    <code class="entry-row__code">{{ entry.command }}</code>
+    <button type="button" class="entry-copy" data-command="{{ entry.command|e }}">[copy]</button>
+  </td>
+  <td class="entry-row__actions">
+    <button
+      type="button"
+      class="entry-row__btn"
+      hx-get="/entries/{{ entry.id }}/edit"
+      hx-target="#entry-row-{{ entry.id }}"
+      hx-swap="outerHTML"
+    >Edit</button>
+    <button
+      type="button"
+      class="entry-row__btn entry-row__btn--danger"
+      hx-delete="/entries/{{ entry.id }}"
+      hx-target="#entry-row-{{ entry.id }}"
+      hx-swap="delete"
+      hx-confirm="Delete this entry?"
+    >Delete</button>
+  </td>
+</tr>

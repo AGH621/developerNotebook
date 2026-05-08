@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}{{ topic.name }} — Developer Notebook{% endblock %}
+{% block main_extra_class %} site-main--topic{% endblock %}
+{% block content %}
+<div class="topic-shell">
+  <header class="topic-header">
+    <p class="topic-back"><a href="/">← Topics</a></p>
+    <h1 class="topic-title">{{ topic.name }}</h1>
+  </header>
+
+  {% if show_section_sidebar %}
+  <aside class="topic-sidebar" aria-label="Section navigation">
+    <nav class="topic-sidebar__nav">
+      {% for section in sections %}
+        {% if section.name %}
+        <a class="topic-sidebar__link" href="#section-{{ section.id }}">{{ section.name }}</a>
+        {% endif %}
+      {% endfor %}
+    </nav>
+  </aside>
+  {% endif %}
+
+  <div id="section-list" class="section-list">
+    {% for section in sections %}
+      {% include "partials/section.html" %}
+    {% endfor %}
+  </div>
+
+  <footer class="topic-footer">
+    <div class="topic-footer__add-section">
+      {% set action = "/topics/" ~ topic.id ~ "/sections" %}
+      {% set target = "#section-list" %}
+      {% set label = "New section name" %}
+      {% set placeholder = "Section name" %}
+      {% set submit_label = "+ Add Section" %}
+      {% include "partials/add_form.html" %}
+    </div>
+  </footer>
+</div>
+
+<script>
+(function () {
+  function postForm(url, field, ids) {
+    if (!ids.length) return;
+    var body = new URLSearchParams();
+    body.set(field, ids.join(","));
+    return fetch(url, {
+      method: "PUT",
+      body: body,
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    }).catch(function () {});
+  }
+
+  function bindTopicPageSortables() {
+    if (typeof Sortable === "undefined") return;
+
+    var sectionList = document.getElementById("section-list");
+    if (sectionList) {
+      if (sectionList._sortableSections) {
+        try { sectionList._sortableSections.destroy(); } catch (e) {}
+      }
+      sectionList._sortableSections = new Sortable(sectionList, {
+        animation: 150,
+        handle: ".topic-section__drag",
+        draggable: ".topic-section",
+        filter: ".topic-section--editing",
+        preventOnFilter: false,
+        ghostClass: "sortable-ghost",
+        dragClass: "sortable-drag",
+        onEnd: function () {
+          var ids = [].map.call(sectionList.querySelectorAll(".topic-section"), function (el) {
+            return el.getAttribute("data-section-id");
+          }).filter(Boolean);
+          postForm("/sections/reorder", "section_order", ids);
+        },
+      });
+    }
+
+    [].forEach.call(document.querySelectorAll(".entry-tbody"), function (tbody) {
+      if (tbody._sortableEntries) {
+        try { tbody._sortableEntries.destroy(); } catch (e) {}
+      }
+      tbody._sortableEntries = new Sortable(tbody, {
+        animation: 150,
+        handle: ".entry-row__drag",
+        draggable: "tr.entry-row",
+        filter: ".entry-row--editing",
+        preventOnFilter: false,
+        ghostClass: "sortable-ghost",
+        dragClass: "sortable-drag",
+        onEnd: function () {
+          var ids = [].map.call(tbody.querySelectorAll("tr.entry-row"), function (el) {
+            return el.getAttribute("data-entry-id");
+          }).filter(Boolean);
+          postForm("/entries/reorder", "entry_order", ids);
+        },
+      });
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", bindTopicPageSortables);
+  document.body.addEventListener("htmx:afterSwap", bindTopicPageSortables);
+})();
+</script>
+{% endblock %}
