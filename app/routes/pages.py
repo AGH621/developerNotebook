@@ -50,12 +50,11 @@ async def home(
     Returns
     -------
     TemplateResponse
-        Renders ``home.html`` with eagerly loaded section counts.
+        Renders ``home.html`` with the user's topics in display order.
     """
     topics = db.scalars(
         select(Topic)
         .where(Topic.user_id == user.id)
-        .options(selectinload(Topic.sections))
         .order_by(Topic.display_order.asc(), Topic.id.asc()),
     ).all()
     return templates.TemplateResponse(

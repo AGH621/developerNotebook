@@ -26,6 +26,7 @@ def _topic_owned(db: Session, topic_id: int, user_id: int) -> Topic | None:
 
 
 def _topic_with_sections(db: Session, topic_id: int) -> Topic | None:
+    """Topic row with sections loaded (used by topic page partials)."""
     return db.scalars(
         select(Topic)
         .where(Topic.id == topic_id)
@@ -71,14 +72,11 @@ async def create_topic(
     db.add(section)
     db.commit()
     db.refresh(topic)
-    topic_loaded = _topic_with_sections(db, topic.id)
-    if topic_loaded is None:
-        raise RuntimeError("Failed to load topic after create")
     topics_log.info("Topic created id=%s user_id=%s", topic.id, user.id)
     return templates.TemplateResponse(
         request,
         "partials/topic_card.html",
-        {"topic": topic_loaded},
+        {"topic": topic},
     )
 
 
@@ -117,11 +115,10 @@ async def topic_edit_partial(
             user.id,
         )
         return Response(status_code=404)
-    topic_loaded = _topic_with_sections(db, topic_id)
     return templates.TemplateResponse(
         request,
         "partials/topic_card_edit.html",
-        {"topic": topic_loaded},
+        {"topic": topic},
     )
 
 
@@ -160,11 +157,10 @@ async def topic_card_partial(
             user.id,
         )
         return Response(status_code=404)
-    topic_loaded = _topic_with_sections(db, topic_id)
     return templates.TemplateResponse(
         request,
         "partials/topic_card.html",
-        {"topic": topic_loaded},
+        {"topic": topic},
     )
 
 
@@ -274,11 +270,10 @@ async def rename_topic(
         user.id,
         topic.slug,
     )
-    topic_loaded = _topic_with_sections(db, topic_id)
     return templates.TemplateResponse(
         request,
         "partials/topic_card.html",
-        {"topic": topic_loaded},
+        {"topic": topic},
     )
 
 

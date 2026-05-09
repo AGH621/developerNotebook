@@ -4,38 +4,59 @@
   data-entry-id="{{ entry.id|string }}"
 >
   <td class="entry-row__description">
-    <button
-      type="button"
-      class="entry-row__drag"
-      aria-label="Reorder entries"
-      title="Drag to reorder"
-    >⋮⋮</button>
-    <span class="entry-row__description-text">{{ entry.description }}</span>
+    <div class="entry-row__description-inner">
+      <button
+        type="button"
+        class="entry-row__drag"
+        aria-label="Reorder entries"
+        title="Drag to reorder"
+      >⋮⋮</button>
+      <span class="entry-row__description-text">{{ entry.description }}</span>
+    </div>
   </td>
   <td class="entry-row__command">
     <code class="entry-row__code">{{ entry.command }}</code>
-    <button
-      type="button"
-      class="entry-copy"
-      data-command="{{ entry.command|e }}"
-      aria-label="Copy command to clipboard"
-    >[copy]</button>
   </td>
   <td class="entry-row__actions">
-    <button
-      type="button"
-      class="entry-row__btn"
-      hx-get="/entries/{{ entry.id }}/edit"
-      hx-target="#entry-row-{{ entry.id }}"
-      hx-swap="outerHTML"
-    >Edit</button>
-    <button
-      type="button"
-      class="entry-row__btn entry-row__btn--danger"
-      hx-delete="/entries/{{ entry.id }}"
-      hx-target="#entry-row-{{ entry.id }}"
-      hx-swap="delete"
-      hx-confirm="Delete this entry?"
-    >Delete</button>
+    <div class="entry-row__actions-inner">
+      <button
+        type="button"
+        class="entry-copy entry-row__btn icon-label-btn"
+        data-command="{{ entry.command|e }}"
+        title="Copy"
+        aria-label="Copy command to clipboard"
+      >
+        <span class="icon-label-btn__icon" aria-hidden="true">
+          <svg><use href="#sprite-icon-copy"/></svg>
+        </span>
+      </button>
+      <button
+        type="button"
+        class="entry-row__btn icon-label-btn"
+        title="Edit"
+        aria-label="Edit entry"
+        hx-get="/entries/{{ entry.id }}/edit"
+        hx-target="#entry-row-{{ entry.id }}"
+        hx-swap="outerHTML"
+      >
+        <span class="icon-label-btn__icon" aria-hidden="true">
+          <svg><use href="#sprite-icon-edit"/></svg>
+        </span>
+      </button>
+      <button
+        type="button"
+        class="entry-row__btn entry-row__btn--danger icon-label-btn"
+        title="Delete"
+        aria-label="Delete entry"
+        hx-delete="/entries/{{ entry.id }}"
+        hx-target="#entry-row-{{ entry.id }}"
+        hx-swap="delete"
+        hx-confirm="Delete this entry?"
+      >
+        <span class="icon-label-btn__icon" aria-hidden="true">
+          <svg><use href="#sprite-topic-menu-delete"/></svg>
+        </span>
+      </button>
+    </div>
   </td>
 </tr>

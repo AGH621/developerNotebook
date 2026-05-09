@@ -4,14 +4,42 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Developer Notebook{% endblock %}</title>
+  <script>
+  (function () {
+    var STORAGE_KEY = "developer-notebook-theme";
+    try {
+      var stored = localStorage.getItem(STORAGE_KEY);
+      if (stored === "light" || stored === "dark") {
+        document.documentElement.setAttribute("data-theme", stored);
+        return;
+      }
+    } catch (e) {}
+    var dark =
+      window.matchMedia &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+  })();
+  </script>
   <link rel="stylesheet" href="/static/styles.css">
   <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js" defer></script>
   {% block head %}{% endblock %}
 </head>
 <body>
+{% include "partials/topic_menu_sprite.html" %}
   <nav class="site-nav">
     <a href="/" class="site-nav__brand">Developer Notebook</a>
+    <div class="site-nav__theme">
+      <button type="button" class="site-nav__theme-toggle" id="theme-toggle" aria-label="Use dark theme" title="Dark mode">
+        <svg class="site-nav__theme-icon--moon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+        </svg>
+        <svg class="site-nav__theme-icon--sun" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <circle cx="12" cy="12" r="4"/>
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+        </svg>
+      </button>
+    </div>
     {% if user %}
     <span class="site-nav__user">{{ user.username }}</span>
     <form method="post" action="/logout" class="site-nav__logout">
@@ -22,6 +50,33 @@
   <main class="site-main{% block main_extra_class %}{% endblock %}">
     {% block content %}{% endblock %}
   </main>
+  <script>
+  (function () {
+    var STORAGE_KEY = "developer-notebook-theme";
+    var toggle = document.getElementById("theme-toggle");
+    if (!toggle) return;
+
+    function applyLabel(theme) {
+      var dark = theme === "dark";
+      toggle.setAttribute("aria-label", dark ? "Use light theme" : "Use dark theme");
+      toggle.setAttribute("title", dark ? "Light mode" : "Dark mode");
+    }
+
+    applyLabel(document.documentElement.getAttribute("data-theme") || "light");
+
+    toggle.addEventListener("click", function () {
+      var next =
+        document.documentElement.getAttribute("data-theme") === "dark"
+          ? "light"
+          : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      try {
+        localStorage.setItem(STORAGE_KEY, next);
+      } catch (e) {}
+      applyLabel(next);
+    });
+  })();
+  </script>
   <script>
   (function () {
     var COPIED_MS = 1600;
@@ -62,28 +117,34 @@
       if (text === null || text === "") return;
 
       evt.preventDefault();
-      var prevLabel = (btn.textContent || "").trim();
+      var prevTitle = btn.getAttribute("title");
+      if (prevTitle === null) prevTitle = "";
       var prevAria = btn.getAttribute("aria-label");
+      if (prevAria === null) prevAria = "";
       btn.disabled = true;
+
+      function setFeedback(titleText, ariaText) {
+        btn.setAttribute("title", titleText);
+        if (ariaText) btn.setAttribute("aria-label", ariaText);
+        else btn.removeAttribute("aria-label");
+      }
 
       copyText(text)
         .then(function () {
           btn.classList.add("is-copied");
-          btn.textContent = "Copied!";
-          btn.setAttribute("aria-label", "Command copied to clipboard");
+          setFeedback("Copied!", "Command copied to clipboard");
           window.setTimeout(function () {
-            btn.textContent = prevLabel;
             btn.classList.remove("is-copied");
+            btn.setAttribute("title", prevTitle);
             if (prevAria) btn.setAttribute("aria-label", prevAria);
             else btn.removeAttribute("aria-label");
             btn.disabled = false;
           }, COPIED_MS);
         })
         .catch(function () {
-          btn.textContent = "Failed";
-          btn.setAttribute("aria-label", "Copy failed");
+          setFeedback("Failed", "Copy failed");
           window.setTimeout(function () {
-            btn.textContent = prevLabel;
+            btn.setAttribute("title", prevTitle);
             if (prevAria) btn.setAttribute("aria-label", prevAria);
             else btn.removeAttribute("aria-label");
             btn.disabled = false;

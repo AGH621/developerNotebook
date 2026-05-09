@@ -7,24 +7,41 @@
     <button type="button" class="topic-card__drag" aria-label="Reorder topics" title="Drag to reorder">⋮⋮</button>
     <div class="topic-card__body">
       <a class="topic-card__title" href="/topic/{{ topic.slug }}">{{ topic.name }}</a>
-      <p class="topic-card__meta">{{ topic.sections|length }} section{% if topic.sections|length != 1 %}s{% endif %}</p>
     </div>
     <div class="topic-card__actions">
-      <button
-        type="button"
-        class="topic-card__btn"
-        hx-get="/topics/{{ topic.id }}/edit"
-        hx-target="#topic-card-{{ topic.id }}"
-        hx-swap="outerHTML"
-      >Rename</button>
-      <button
-        type="button"
-        class="topic-card__btn topic-card__btn--danger"
-        hx-delete="/topics/{{ topic.id }}"
-        hx-target="#topic-card-{{ topic.id }}"
-        hx-swap="delete"
-        hx-confirm="Delete this topic and all of its sections?"
-      >Delete</button>
+      <details class="topic-card__menu">
+        <summary class="topic-card__menu-trigger">
+          <span class="sr-only">Topic actions</span>
+          <svg class="topic-card__sprite-icon topic-card__sprite-icon--trigger" aria-hidden="true"><use href="#sprite-topic-menu-arrow"/></svg>
+        </summary>
+        <div class="topic-card__menu-dropdown" role="group" aria-label="Topic actions">
+          <button
+            type="button"
+            class="topic-card__menu-item"
+            hx-get="/topics/{{ topic.id }}/edit"
+            hx-target="#topic-card-{{ topic.id }}"
+            hx-swap="outerHTML"
+          >
+            <span class="topic-card__menu-item-icon" aria-hidden="true">
+              <svg><use href="#sprite-topic-menu-pencil"/></svg>
+            </span>
+            <span class="topic-card__menu-item-label">Rename</span>
+          </button>
+          <button
+            type="button"
+            class="topic-card__menu-item topic-card__menu-item--danger"
+            hx-delete="/topics/{{ topic.id }}"
+            hx-target="#topic-card-{{ topic.id }}"
+            hx-swap="delete"
+            hx-confirm="Delete this topic and all of its sections?"
+          >
+            <span class="topic-card__menu-item-icon" aria-hidden="true">
+              <svg><use href="#sprite-topic-menu-delete"/></svg>
+            </span>
+            <span class="topic-card__menu-item-label">Delete</span>
+          </button>
+        </div>
+      </details>
     </div>
   </div>
 </article>

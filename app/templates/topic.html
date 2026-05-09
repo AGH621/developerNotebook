@@ -11,11 +11,15 @@
   {% if show_section_sidebar %}
   <aside class="topic-sidebar" aria-label="Section navigation">
     <nav class="topic-sidebar__nav">
-      {% for section in sections %}
-        {% if section.name %}
-        <a class="topic-sidebar__link" href="#section-{{ section.id }}">{{ section.name }}</a>
-        {% endif %}
-      {% endfor %}
+      <ul class="topic-sidebar__list">
+        {% for section in sections %}
+          {% if section.name %}
+          <li>
+            <a class="topic-sidebar__link" href="#section-{{ section.id }}">{{ section.name }}</a>
+          </li>
+          {% endif %}
+        {% endfor %}
+      </ul>
     </nav>
   </aside>
   {% endif %}

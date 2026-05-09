@@ -52,6 +52,25 @@
   }
   document.addEventListener("DOMContentLoaded", bindTopicSortable);
   document.body.addEventListener("htmx:afterSwap", bindTopicSortable);
+
+  document.body.addEventListener(
+    "toggle",
+    function (e) {
+      var t = e.target;
+      if (
+        !t ||
+        !t.classList ||
+        !t.classList.contains("topic-card__menu") ||
+        !t.open
+      ) {
+        return;
+      }
+      document.querySelectorAll(".topic-card__menu").forEach(function (menu) {
+        if (menu !== t) menu.open = false;
+      });
+    },
+    true,
+  );
 })();
 </script>
 {% endblock %}

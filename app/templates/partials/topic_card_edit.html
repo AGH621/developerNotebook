@@ -14,7 +14,12 @@
       <input type="text" name="name" value="{{ topic.name }}" maxlength="256" autofocus>
     </label>
     <div class="topic-card__edit-actions">
-      <button type="submit" class="topic-card__btn">Save</button>
+      <button type="submit" class="topic-card__btn icon-label-btn">
+        <span class="icon-label-btn__icon" aria-hidden="true">
+          <svg><use href="#sprite-topic-menu-pencil"/></svg>
+        </span>
+        <span class="icon-label-btn__label">Save</span>
+      </button>
       <button
         type="button"
         class="topic-card__btn"

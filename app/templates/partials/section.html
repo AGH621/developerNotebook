@@ -5,34 +5,50 @@
 >
   <header class="topic-section__header">
     <div class="topic-section__toolbar">
-      <button
-        type="button"
-        class="topic-section__drag"
-        aria-label="Reorder sections"
-        title="Drag to reorder"
-      >⋮⋮</button>
-      <div class="topic-section__heading">
-        {% if not hide_section_chrome %}
-        <h2 class="topic-section__title" id="section-heading-{{ section.id }}">
-          {% if section.name %}{{ section.name }}{% else %}Default{% endif %}
-        </h2>
-        {% endif %}
+      <div class="topic-section__toolbar-main">
+        <button
+          type="button"
+          class="topic-section__drag"
+          aria-label="Reorder sections"
+          title="Drag to reorder"
+        >⋮⋮</button>
+        <div class="topic-section__heading">
+          {% if not hide_section_chrome %}
+          <h2 class="topic-section__title" id="section-heading-{{ section.id }}">
+            {% if section.name %}{{ section.name }}{% else %}Default{% endif %}
+          </h2>
+          {% endif %}
+        </div>
+      </div>
+      <div class="topic-section__toolbar-end">
         <div class="topic-section__actions">
           <button
             type="button"
-            class="topic-section__btn"
+            class="topic-section__btn icon-label-btn"
+            title="Edit section"
+            aria-label="Edit section"
             hx-get="/sections/{{ section.id }}/edit"
             hx-target="#section-{{ section.id }}"
             hx-swap="outerHTML"
-          >Edit section</button>
+          >
+            <span class="icon-label-btn__icon" aria-hidden="true">
+              <svg><use href="#sprite-icon-edit"/></svg>
+            </span>
+          </button>
           <button
             type="button"
-            class="topic-section__btn topic-section__btn--danger"
+            class="topic-section__btn topic-section__btn--danger icon-label-btn"
+            title="Delete"
+            aria-label="Delete section"
             hx-delete="/sections/{{ section.id }}"
             hx-target="#section-{{ section.id }}"
             hx-swap="delete"
             hx-confirm="Delete this section and all of its entries?"
-          >Delete</button>
+          >
+            <span class="icon-label-btn__icon" aria-hidden="true">
+              <svg><use href="#sprite-topic-menu-delete"/></svg>
+            </span>
+          </button>
         </div>
       </div>
     </div>
@@ -43,6 +59,14 @@
 
   <div class="topic-section__body">
     <div class="entry-table-wrap">
+      <form
+        id="add-entry-form-{{ section.id }}"
+        class="add-form add-form--entry add-form--entry-associate"
+        hx-post="/sections/{{ section.id }}/entries"
+        hx-target="#entries-tbody-{{ section.id }}"
+        hx-swap="beforeend"
+        hx-on::after-request="if(event.detail.successful && event.target === this) this.reset()"
+      ></form>
       <table
         class="entry-table"
         {% if not hide_section_chrome %}
@@ -67,16 +91,13 @@
             {% include "partials/entry_row.html" %}
           {% endfor %}
         </tbody>
+        <tfoot class="entry-table__add-foot">
+          <tr>
+            {% set submit_label = "+ Add Entry" %}
+            {% include "partials/add_form_entry_tfoot.html" %}
+          </tr>
+        </tfoot>
       </table>
-    </div>
-
-    <div class="topic-section__add-entry">
-      {% set variant = 'entry' %}
-      {% set action = "/sections/" ~ section.id ~ "/entries" %}
-      {% set target = "#entries-tbody-" ~ section.id|string %}
-      {% set swap = 'beforeend' %}
-      {% set submit_label = "+ Add Entry" %}
-      {% include "partials/add_form.html" %}
     </div>
   </div>
 </section>

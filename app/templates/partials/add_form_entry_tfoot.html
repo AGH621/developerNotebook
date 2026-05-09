@@ -1,0 +1,31 @@
+{# Add-entry row cells; controls associate with form#add-entry-form-{section.id} in section.html #}
+{% set fid = "add-entry-form-" ~ section.id|string %}
+<td class="entry-table__col-desc">
+  <label class="add-form__label">
+    <span class="sr-only">{{ desc_label|default('Description') }}</span>
+    <input
+      type="text"
+      name="description"
+      form="{{ fid }}"
+      placeholder="{{ desc_placeholder|default('What it does') }}"
+      maxlength="2048"
+      autocomplete="off"
+    >
+  </label>
+</td>
+<td class="entry-table__col-cmd">
+  <label class="add-form__label">
+    <span class="sr-only">{{ cmd_label|default('Command') }}</span>
+    <input
+      type="text"
+      name="command"
+      form="{{ fid }}"
+      placeholder="{{ cmd_placeholder|default('Command') }}"
+      maxlength="2048"
+      autocomplete="off"
+    >
+  </label>
+</td>
+<td class="entry-table__col-actions">
+  <button type="submit" class="add-form__submit" form="{{ fid }}">{{ submit_label|default('+ Add Entry') }}</button>
+</td>
