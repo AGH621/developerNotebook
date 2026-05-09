@@ -70,6 +70,12 @@ def test_topic_page_redirects_when_unauthenticated(client: TestClient):
     assert r.headers.get("location") == "/login"
 
 
+def test_seed_topics_redirects_when_unauthenticated(client: TestClient):
+    r = client.get("/seed-topics")
+    assert r.status_code == 303
+    assert r.headers.get("location") == "/login"
+
+
 @pytest.fixture
 def _registered(client: TestClient):
     client.post(

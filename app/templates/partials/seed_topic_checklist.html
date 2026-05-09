@@ -1,0 +1,33 @@
+{# Expects: starter_topics (with already_have), submit_label, checklist_id #}
+{% set can_add = starter_topics | rejectattr('already_have') | list | length > 0 %}
+<div class="welcome-topic-toolbar">
+  <button type="button" class="welcome-topic-toolbar__btn" data-seed-topic-action="all" aria-controls="{{ checklist_id }}">
+    Select all
+  </button>
+  <button type="button" class="welcome-topic-toolbar__btn" data-seed-topic-action="none" aria-controls="{{ checklist_id }}">
+    Deselect all
+  </button>
+</div>
+<ul id="{{ checklist_id }}" class="welcome-topic-list" role="group" aria-label="Technologies to seed">
+  {% for t in starter_topics %}
+  <li class="welcome-topic-row{% if t.already_have %} welcome-topic-row--have{% endif %}">
+    <label class="welcome-topic-label{% if t.already_have %} welcome-topic-label--disabled{% endif %}">
+      <input
+        type="checkbox"
+        name="topic"
+        value="{{ t.index }}"
+        {% if t.already_have %}disabled{% else %}checked{% endif %}
+      >
+      <span class="welcome-topic-name">{{ t.name }}</span>
+      <span class="welcome-topic-meta">
+        {% if t.already_have %}
+        Already in notebook
+        {% else %}
+        {{ t.n_sections }} section{% if t.n_sections != 1 %}s{% endif %}, {{ t.n_entries }} command{% if t.n_entries != 1 %}s{% endif %}
+        {% endif %}
+      </span>
+    </label>
+  </li>
+  {% endfor %}
+</ul>
+<button type="submit" class="auth-form__submit welcome-seed-submit" {% if not can_add %}disabled{% endif %}>{{ submit_label }}</button>

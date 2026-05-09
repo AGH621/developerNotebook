@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Add starter cheatsheets — Developer Notebook{% endblock %}
+{% block content %}
+<section class="welcome welcome--seed-topics">
+  <h1>Add starter cheatsheets</h1>
+  <p class="welcome__intro">Import bundled command cheatsheets for technologies you do not already have as topics. Existing topics are skipped automatically.</p>
+
+  {% if error %}
+  <p class="auth-panel__error" role="alert">{{ error }}</p>
+  {% endif %}
+
+  <form method="post" action="/seed-topics" class="welcome-card-form seed-topic-form">
+    <div class="welcome-seed-panel welcome-seed-panel--standalone">
+      <h2 class="welcome-card__title welcome-seed-panel__heading">Available starter topics</h2>
+      <p class="welcome-card__body welcome-seed-panel__lead">Uncheck any technologies you do not want to add.</p>
+      {% set checklist_id = "seed-topic-list" %}
+      {% set submit_label = "Add to notebook" %}
+      {% include "partials/seed_topic_checklist.html" %}
+    </div>
+  </form>
+  <p class="welcome-seed-back"><a href="/">← Back to topics</a></p>
+</section>
+{% include "partials/seed_topic_checklist_script.html" %}
+{% endblock %}

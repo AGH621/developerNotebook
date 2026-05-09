@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Welcome — Developer Notebook{% endblock %}
 {% block content %}
-<section class="welcome">
+<section class="welcome welcome--onboarding">
   <h1>Welcome</h1>
-  <p class="welcome__intro">Pick how you want to start your notebook.</p>
+  <p class="welcome__intro">Choose whether to start empty or pre-load command cheatsheets. If you seed topics, pick only the technologies you want.</p>
 
   {% if error %}
   <p class="auth-panel__error" role="alert">{{ error }}</p>
@@ -11,19 +11,23 @@
 
   <div class="welcome-cards">
     <form method="post" action="/welcome" class="welcome-card-form">
-      <input type="hidden" name="choice" value="template">
-      <button type="submit" class="welcome-card">
-        <span class="welcome-card__title">Start with Developer Commands template</span>
-        <span class="welcome-card__body">Loads a cheat sheet covering Git, shell, databases, frameworks, CLIs, and more.</span>
-      </button>
-    </form>
-    <form method="post" action="/welcome" class="welcome-card-form">
       <input type="hidden" name="choice" value="blank">
       <button type="submit" class="welcome-card">
         <span class="welcome-card__title">Start with a blank notebook</span>
-        <span class="welcome-card__body">No topics yet — you can add topics from your home page when it is ready.</span>
+        <span class="welcome-card__body">No topics yet — you can add topics from your home page when you are ready.</span>
       </button>
+    </form>
+    <form method="post" action="/welcome" class="welcome-card-form seed-topic-form">
+      <input type="hidden" name="choice" value="template">
+      <div class="welcome-seed-panel">
+        <h2 class="welcome-card__title welcome-seed-panel__heading">Seed selected topics</h2>
+        <p class="welcome-card__body welcome-seed-panel__lead">Starter cheatsheets bundled with this app. Uncheck anything you do not need.</p>
+        {% set checklist_id = "welcome-topic-list" %}
+        {% set submit_label = "Add selected topics" %}
+        {% include "partials/seed_topic_checklist.html" %}
+      </div>
     </form>
   </div>
 </section>
+{% include "partials/seed_topic_checklist_script.html" %}
 {% endblock %}

@@ -47,3 +47,26 @@ try:
     STARTER_DATA: list[dict] = parse_developer_commands_docx()
 except (FileNotFoundError, PackageNotFoundError):
     STARTER_DATA = _FALLBACK_STARTER_DATA
+
+
+def starter_topics_meta() -> list[dict[str, int | str]]:
+    """Metadata for each starter topic (for onboarding UI).
+
+    Rows are ordered alphabetically by topic name (Unicode case-fold). Each
+    ``index`` is still the topic's position in :data:`STARTER_DATA` for form
+    submissions.
+    """
+    result: list[dict[str, int | str]] = []
+    for i, topic in enumerate(STARTER_DATA):
+        sections = topic["sections"]
+        n_entries = sum(len(s["entries"]) for s in sections)
+        result.append(
+            {
+                "index": i,
+                "name": str(topic["name"]),
+                "n_sections": len(sections),
+                "n_entries": n_entries,
+            },
+        )
+    result.sort(key=lambda m: str(m["name"]).casefold())
+    return result

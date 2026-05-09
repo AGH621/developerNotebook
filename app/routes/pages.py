@@ -7,7 +7,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 from starlette.responses import Response
@@ -23,7 +23,12 @@ from app.auth import (
 from app.database import get_db
 from app.models import Section, Topic, User
 from app.routes.sections import _topic_context_flags
-from app.services.seed import populate_starter_data
+from app.seed_data import STARTER_DATA
+from app.services.seed import (
+    populate_starter_data,
+    starter_topic_indices_available,
+    starter_topics_for_user,
+)
 from app.templating import templates
 
 router = APIRouter()
@@ -346,14 +351,38 @@ async def welcome_get(
     return templates.TemplateResponse(
         request,
         "welcome.html",
-        {"user": user, "error": None},
+        {
+            "user": user,
+            "error": None,
+            "starter_topics": starter_topics_for_user(db, user.id),
+        },
     )
+
+
+def _next_topic_display_order(db: Session, user_id: int) -> int:
+    """First ``display_order`` value for a new topic appended to the notebook."""
+    raw = db.scalar(
+        select(func.coalesce(func.max(Topic.display_order), -1)).where(Topic.user_id == user_id),
+    )
+    return int(raw) + 1
+
+
+def _parse_topic_indices(form_values: list[str], *, n_topics: int) -> frozenset[int]:
+    """Return valid distinct starter topic indices from form ``topic`` fields."""
+    seen: set[int] = set()
+    for raw in form_values:
+        try:
+            i = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if 0 <= i < n_topics:
+            seen.add(i)
+    return frozenset(seen)
 
 
 @router.post("/welcome")
 async def welcome_post(
     request: Request,
-    choice: Annotated[str, Form()],
     user: User = Depends(require_auth),
     db: Session = Depends(get_db),
 ):
@@ -362,10 +391,9 @@ async def welcome_post(
     Parameters
     ----------
     request : Request
-        Used to render ``welcome.html`` when validation fails.
-    choice : str
-        Form field ``choice``: ``template`` imports starter commands; ``blank``
-        skips inserts.
+        Used to render ``welcome.html`` when validation fails. Form fields:
+        ``choice`` (``template`` or ``blank``), and ``topic`` (repeated indices
+        when ``choice`` is ``template``).
     user : User
         Authenticated user from :func:`app.auth.require_auth`.
     db : Session
@@ -382,19 +410,106 @@ async def welcome_post(
     if db.scalars(select(Topic.id).where(Topic.user_id == user.id)).first() is not None:
         return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
-    normalized = choice.strip().lower()
+    form = await request.form()
+    choice_raw = form.get("choice")
+    normalized = str(choice_raw or "").strip().lower()
+    starter_ctx = {"user": user, "starter_topics": starter_topics_for_user(db, user.id)}
+
     if normalized not in ("template", "blank"):
         return templates.TemplateResponse(
             request,
             "welcome.html",
-            {"user": user, "error": "Pick one of the two options."},
+            {**starter_ctx, "error": "Pick blank notebook or seed selected topics."},
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
     if normalized == "template":
-        populate_starter_data(db, user.id)
+        raw_topics = form.getlist("topic")
+        topic_indices = _parse_topic_indices(
+            [str(v) for v in raw_topics],
+            n_topics=len(STARTER_DATA),
+        )
+        if not topic_indices:
+            return templates.TemplateResponse(
+                request,
+                "welcome.html",
+                {
+                    **starter_ctx,
+                    "error": "Choose at least one technology to seed, or start blank.",
+                },
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        populate_starter_data(db, user.id, topic_indices=topic_indices)
         db.commit()
 
+    return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/seed-topics")
+async def seed_topics_get(
+    request: Request,
+    user: User = Depends(require_auth),
+    db: Session = Depends(get_db),
+):
+    """Pick bundled cheatsheets to add to an existing notebook."""
+    return templates.TemplateResponse(
+        request,
+        "seed_topics.html",
+        {
+            "user": user,
+            "error": None,
+            "starter_topics": starter_topics_for_user(db, user.id),
+        },
+    )
+
+
+@router.post("/seed-topics")
+async def seed_topics_post(
+    request: Request,
+    user: User = Depends(require_auth),
+    db: Session = Depends(get_db),
+):
+    """Insert selected starter topics that the user does not already have."""
+    form = await request.form()
+    raw_topics = form.getlist("topic")
+    topic_indices = _parse_topic_indices(
+        [str(v) for v in raw_topics],
+        n_topics=len(STARTER_DATA),
+    )
+    starter_ctx = {"user": user, "starter_topics": starter_topics_for_user(db, user.id)}
+
+    if not topic_indices:
+        return templates.TemplateResponse(
+            request,
+            "seed_topics.html",
+            {
+                **starter_ctx,
+                "error": "Choose at least one technology to add.",
+            },
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    allowed = starter_topic_indices_available(db, user.id)
+    to_seed = topic_indices & allowed
+    if not to_seed:
+        return templates.TemplateResponse(
+            request,
+            "seed_topics.html",
+            {
+                **starter_ctx,
+                "error": "Those topics are already in your notebook.",
+            },
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    next_order = _next_topic_display_order(db, user.id)
+    populate_starter_data(
+        db,
+        user.id,
+        topic_indices=to_seed,
+        display_order_start=next_order,
+    )
+    db.commit()
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
 
