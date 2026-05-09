@@ -107,13 +107,11 @@
     document.body.addEventListener("click", function (evt) {
       var btn = evt.target && evt.target.closest && evt.target.closest(".entry-copy");
       if (!btn || btn.disabled) return;
-
-      var text = btn.getAttribute("data-command");
-      if (text === null || text === "") {
-        var row = btn.closest(".entry-row");
-        var code = row && row.querySelector(".entry-row__code");
-        text = code ? code.textContent.replace(/\u00a0/g, " ").trim() : "";
-      }
+      var row = btn.closest(".entry-row");
+      var code = row && row.querySelector(".entry-row__code");
+      var text = code
+        ? (code.textContent || "").replace(/\u00a0/g, " ").trim()
+        : (btn.getAttribute("data-command") || "").replace(/\u00a0/g, " ").trim();
       if (text === null || text === "") return;
 
       evt.preventDefault();
@@ -151,6 +149,176 @@
           }, 1800);
         });
     });
+  })();
+  </script>
+  <script>
+  (function () {
+    /** Fixed-position tooltips; escape overflow clipping from .entry-table-wrap. */
+    var GAP = 6;
+    var MARGIN = 10;
+    var MAX_TOOLTIP_W = 352;
+    var activeWrap = null;
+
+    function clamp(n, lo, hi) {
+      return Math.round(Math.min(Math.max(n, lo), hi));
+    }
+
+    function dismissAll() {
+      if (!activeWrap) return;
+      var tip = activeWrap.querySelector(".entry-row__ellipsis-tooltip");
+      if (tip) {
+        tip.classList.remove("entry-row__ellipsis-tooltip--open");
+        tip.style.removeProperty("--entry-tip-left");
+        tip.style.removeProperty("--entry-tip-top");
+        tip.style.opacity = "";
+      }
+      activeWrap = null;
+    }
+
+    function hideLeaving(wrap) {
+      if (wrap && activeWrap === wrap) dismissAll();
+    }
+
+    function placeTip(wrap) {
+      var tip = wrap.querySelector(".entry-row__ellipsis-tooltip");
+      var btn = wrap.querySelector(".entry-row__ellipsis-btn");
+      if (!tip || !btn) return;
+
+      dismissAll();
+
+      var maxW = Math.min(MAX_TOOLTIP_W, Math.max(120, window.innerWidth - 2 * MARGIN));
+      tip.style.maxWidth = maxW + "px";
+
+      tip.style.setProperty("--entry-tip-top", "0px");
+      tip.classList.add("entry-row__ellipsis-tooltip--open");
+      tip.style.opacity = "0";
+      activeWrap = wrap;
+
+      requestAnimationFrame(function () {
+        if (activeWrap !== wrap) return;
+
+        function positionOnce() {
+          var vw = window.innerWidth;
+          var vh = window.innerHeight;
+          var rr = btn.getBoundingClientRect();
+          var tw = tip.getBoundingClientRect().width;
+          var th = tip.getBoundingClientRect().height;
+          var left = clamp(rr.left, MARGIN, vw - MARGIN - tw);
+          var top = rr.bottom + GAP;
+
+          if (top + th > vh - MARGIN) {
+            top = rr.top - th - GAP;
+          }
+          top = clamp(top, MARGIN, Math.max(MARGIN, vh - MARGIN - th));
+          left = clamp(left, MARGIN, vw - MARGIN - tw);
+
+          tip.style.setProperty("--entry-tip-left", left + "px");
+          tip.style.setProperty("--entry-tip-top", top + "px");
+        }
+
+        positionOnce();
+
+        requestAnimationFrame(function () {
+          if (activeWrap !== wrap) return;
+
+          var vw = window.innerWidth;
+          var vh = window.innerHeight;
+          var rr = btn.getBoundingClientRect();
+          var tr = tip.getBoundingClientRect();
+          var tw = tr.width;
+          var th = tr.height;
+
+          if (tr.bottom > vh - MARGIN || tr.top < MARGIN) {
+            var top = rr.top - th - GAP;
+            top = clamp(top, MARGIN, Math.max(MARGIN, vh - MARGIN - th));
+            tip.style.setProperty("--entry-tip-top", top + "px");
+          }
+
+          var left = clamp(rr.left, MARGIN, vw - MARGIN - tw);
+          tip.style.setProperty("--entry-tip-left", left + "px");
+
+          tip.style.opacity = "";
+        });
+      });
+    }
+
+    document.body.addEventListener(
+      "mouseover",
+      function (evt) {
+        var wrap = evt.target && evt.target.closest && evt.target.closest(".entry-row__ellipsis-wrap");
+        if (!wrap) return;
+        var rel = evt.relatedTarget;
+        if (rel && wrap.contains(rel)) return;
+        placeTip(wrap);
+      },
+      true,
+    );
+
+    document.body.addEventListener(
+      "mouseout",
+      function (evt) {
+        var wrap = evt.target && evt.target.closest && evt.target.closest(".entry-row__ellipsis-wrap");
+        if (!wrap) return;
+        var rel = evt.relatedTarget;
+        if (rel && wrap.contains(rel)) return;
+        hideLeaving(wrap);
+      },
+      true,
+    );
+
+    document.body.addEventListener(
+      "focusin",
+      function (evt) {
+        var wrap = evt.target && evt.target.closest && evt.target.closest(".entry-row__ellipsis-wrap");
+        if (!wrap) return;
+        placeTip(wrap);
+      },
+      true,
+    );
+
+    document.body.addEventListener(
+      "focusout",
+      function () {
+        window.setTimeout(function () {
+          if (!activeWrap) return;
+          if (activeWrap.contains(document.activeElement)) return;
+          try {
+            if (activeWrap.matches(":hover")) return;
+          } catch (ignore) {}
+          dismissAll();
+        }, 0);
+      },
+      true,
+    );
+
+    document.body.addEventListener(
+      "scroll",
+      function () {
+        dismissAll();
+      },
+      true,
+    );
+
+    window.addEventListener("resize", dismissAll);
+
+    document.addEventListener("keydown", function (evt) {
+      if (evt.key === "Escape" || evt.key === "Esc") dismissAll();
+    });
+
+    document.addEventListener(
+      "pointerdown",
+      function (evt) {
+        if (!activeWrap) return;
+        var t = evt.target;
+        if (!t || typeof t.closest !== "function") return;
+        var w = t.closest(".entry-row__ellipsis-wrap");
+        if (w && w === activeWrap) return;
+        dismissAll();
+      },
+      true,
+    );
+
+    document.body.addEventListener("htmx:afterSwap", dismissAll);
   })();
   </script>
 </body>

@@ -8,21 +8,11 @@
     <h1 class="topic-title">{{ topic.name }}</h1>
   </header>
 
-  {% if show_section_sidebar %}
-  <aside class="topic-sidebar" aria-label="Section navigation">
-    <nav class="topic-sidebar__nav">
-      <ul class="topic-sidebar__list">
-        {% for section in sections %}
-          {% if section.name %}
-          <li>
-            <a class="topic-sidebar__link" href="#section-{{ section.id }}">{{ section.name }}</a>
-          </li>
-          {% endif %}
-        {% endfor %}
-      </ul>
-    </nav>
-  </aside>
-  {% endif %}
+  <div id="topic-sidebar-root">
+    {% if show_section_sidebar %}
+      {% include "partials/topic_sidebar_inner.html" %}
+    {% endif %}
+  </div>
 
   <div id="section-list" class="section-list">
     {% for section in sections %}

@@ -13,11 +13,18 @@
           title="Drag to reorder"
         >⋮⋮</button>
         <div class="topic-section__heading">
-          {% if not hide_section_chrome %}
-          <h2 class="topic-section__title" id="section-heading-{{ section.id }}">
-            {% if section.name %}{{ section.name }}{% else %}Default{% endif %}
+          <h2
+            class="topic-section__title{% if hide_section_chrome %} topic-section__title--placeholder{% endif %}"
+            id="section-heading-{{ section.id }}"
+          >
+            {% if section.name %}
+              {{ section.name }}
+            {% elif hide_section_chrome %}
+              Untitled section
+            {% else %}
+              Default
+            {% endif %}
           </h2>
-          {% endif %}
         </div>
       </div>
       <div class="topic-section__toolbar-end">
@@ -69,11 +76,7 @@
       ></form>
       <table
         class="entry-table"
-        {% if not hide_section_chrome %}
         aria-labelledby="section-heading-{{ section.id }}"
-        {% else %}
-        aria-label="Commands in this section"
-        {% endif %}
       >
         <thead>
           <tr>

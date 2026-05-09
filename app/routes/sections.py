@@ -30,8 +30,8 @@ def _topic_context_flags(topic: Topic) -> tuple[bool, bool]:
     Returns
     -------
     tuple of (bool, bool)
-        ``hide_section_chrome`` is True when the topic has a single default
-        unnamed section only. ``show_section_sidebar`` is True when there are
+        ``hide_section_chrome`` when the topic has only one unnamed section
+        (muted “Untitled section” heading; user can rename via Edit). ``show_section_sidebar`` is True when there are
         at least two named sections (anchor navigation).
     """
     secs = sorted(topic.sections, key=lambda s: (s.display_order, s.id))
@@ -39,6 +39,38 @@ def _topic_context_flags(topic: Topic) -> tuple[bool, bool]:
     named_n = sum(1 for s in secs if s.name)
     show_sidebar = named_n >= 2
     return hide, show_sidebar
+
+
+def _sorted_sections(topic: Topic) -> list[Section]:
+    return sorted(topic.sections, key=lambda s: (s.display_order, s.id))
+
+
+def _section_bundle_response(request: Request, topic_loaded: Topic, section: Section):
+    hide_chrome, show_sidebar = _topic_context_flags(topic_loaded)
+    return templates.TemplateResponse(
+        request,
+        "partials/section_oob_bundle.html",
+        {
+            "topic": topic_loaded,
+            "section": section,
+            "hide_section_chrome": hide_chrome,
+            "show_section_sidebar": show_sidebar,
+            "sections": _sorted_sections(topic_loaded),
+        },
+    )
+
+
+def _sidebar_oob_only(request: Request, topic_loaded: Topic):
+    _, show_sidebar = _topic_context_flags(topic_loaded)
+    return templates.TemplateResponse(
+        request,
+        "partials/topic_sidebar_oob.html",
+        {
+            "topic": topic_loaded,
+            "show_section_sidebar": show_sidebar,
+            "sections": _sorted_sections(topic_loaded),
+        },
+    )
 
 
 def _section_owned(db: Session, section_id: int, user_id: int) -> Section | None:
@@ -76,7 +108,7 @@ async def create_section(
     Returns
     -------
     TemplateResponse
-        Renders ``partials/section.html`` for the new section.
+        New section markup plus sidebar ``hx-swap-oob`` when applicable.
     Response
         **404** when the topic is missing or not owned by ``user``.
     """
@@ -106,17 +138,8 @@ async def create_section(
     topic_loaded = _topic_with_sections(db, topic_id)
     if topic_loaded is None:
         raise RuntimeError("Failed to load topic after section create")
-    hide_chrome, _show_sb = _topic_context_flags(topic_loaded)
     sections_log.info("Section created id=%s topic_id=%s user_id=%s", section.id, topic_id, user.id)
-    return templates.TemplateResponse(
-        request,
-        "partials/section.html",
-        {
-            "topic": topic_loaded,
-            "section": section,
-            "hide_section_chrome": hide_chrome,
-        },
-    )
+    return _section_bundle_response(request, topic_loaded, section)
 
 
 @router.get("/sections/{section_id}/edit")
@@ -207,16 +230,7 @@ async def section_view_partial(
     topic_loaded = _topic_with_sections(db, section.topic_id)
     if topic_loaded is None:
         return Response(status_code=404)
-    hide_chrome, _ = _topic_context_flags(topic_loaded)
-    return templates.TemplateResponse(
-        request,
-        "partials/section.html",
-        {
-            "topic": topic_loaded,
-            "section": section,
-            "hide_section_chrome": hide_chrome,
-        },
-    )
+    return _section_bundle_response(request, topic_loaded, section)
 
 
 @router.put("/sections/reorder")
@@ -314,7 +328,7 @@ async def update_section(
     Returns
     -------
     TemplateResponse
-        Refreshed ``partials/section.html`` on success.
+        Updated section markup plus sidebar ``hx-swap-oob``.
     Response
         **404** when unauthorized or missing.
     """
@@ -340,21 +354,13 @@ async def update_section(
     topic_loaded = _topic_with_sections(db, section.topic_id)
     if topic_loaded is None:
         return Response(status_code=404)
-    hide_chrome, _ = _topic_context_flags(topic_loaded)
     sections_log.info("Section updated id=%s topic_id=%s user_id=%s", section.id, section.topic_id, user.id)
-    return templates.TemplateResponse(
-        request,
-        "partials/section.html",
-        {
-            "topic": topic_loaded,
-            "section": section,
-            "hide_section_chrome": hide_chrome,
-        },
-    )
+    return _section_bundle_response(request, topic_loaded, section)
 
 
 @router.delete("/sections/{section_id}")
 async def delete_section(
+    request: Request,
     section_id: int,
     user: User = Depends(require_auth),
     db: Session = Depends(get_db),
@@ -372,8 +378,13 @@ async def delete_section(
 
     Returns
     -------
-    Response
-        **200** empty body for HTMX ``delete`` swap, **404** when not allowed.
+    TemplateResponse
+        Sidebar OOB fragment for HTMX; **404** when not allowed.
+
+    Notes
+    -----
+    Primary ``hx-delete`` swap removes the section node; sidebar ``hx-swap-oob``
+    in the body refreshes TOC visibility.
     """
     section = _section_owned(db, section_id, user.id)
     if section is None:
@@ -386,5 +397,9 @@ async def delete_section(
     tid = section.topic_id
     db.delete(section)
     db.commit()
+    topic_loaded = _topic_with_sections(db, tid)
+    if topic_loaded is None:
+        sections_log.warning("Topic missing after delete section_id=%s topic_id=%s", section_id, tid)
+        return Response(status_code=404)
     sections_log.info("Section deleted id=%s topic_id=%s user_id=%s", section_id, tid, user.id)
-    return Response(status_code=200)
+    return _sidebar_oob_only(request, topic_loaded)

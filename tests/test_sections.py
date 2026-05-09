@@ -31,6 +31,61 @@ def test_post_section_named(topic_with_sections: Topic, authenticated_client: Te
     )
 
 
+def test_single_unnamed_section_edit_exposes_name_field(
+    authenticated_client: TestClient,
+    test_db: Session,
+) -> None:
+    """Lone default section must allow naming (was hidden-input only)."""
+    authenticated_client.post("/topics", data={"name": "Solo"})
+    topic = test_db.scalars(select(Topic).where(Topic.name == "Solo")).one()
+    sec = test_db.scalars(
+        select(Section).where(Section.topic_id == topic.id),
+    ).one()
+    assert sec.name is None
+    r = authenticated_client.get(f"/sections/{sec.id}/edit")
+    assert r.status_code == 200
+    html = r.text
+    assert 'name="name"' in html and 'type="text"' in html
+    authenticated_client.put(f"/sections/{sec.id}", data={"name": "Named!", "notes": ""})
+    test_db.refresh(sec)
+    assert sec.name == "Named!"
+
+
+def test_post_second_named_section_returns_sidebar_oob(
+    authenticated_client: TestClient,
+    test_db: Session,
+) -> None:
+    authenticated_client.post("/topics", data={"name": "Toc"})
+    topic = test_db.scalars(select(Topic).where(Topic.name == "Toc")).one()
+    only = test_db.scalars(select(Section).where(Section.topic_id == topic.id)).one()
+    authenticated_client.put(f"/sections/{only.id}", data={"name": "First", "notes": ""})
+    r = authenticated_client.post(f"/topics/{topic.id}/sections", data={"name": "Second"})
+    assert r.status_code == 200
+    html = r.text
+    assert 'id="topic-sidebar-root"' in html and 'hx-swap-oob="true"' in html
+    assert "topic-sidebar__link" in html
+    assert "First" in html and "Second" in html
+
+
+def test_delete_named_section_oob_hides_sidebar_when_under_two_named(
+    authenticated_client: TestClient,
+    test_db: Session,
+) -> None:
+    authenticated_client.post("/topics", data={"name": "Trm"})
+    topic = test_db.scalars(select(Topic).where(Topic.name == "Trm")).one()
+    s1 = test_db.scalars(select(Section).where(Section.topic_id == topic.id)).one()
+    authenticated_client.put(f"/sections/{s1.id}", data={"name": "A", "notes": ""})
+    authenticated_client.post(f"/topics/{topic.id}/sections", data={"name": "B"})
+    b_sec = test_db.scalars(
+        select(Section).where(Section.topic_id == topic.id, Section.name == "B"),
+    ).one()
+    r = authenticated_client.delete(f"/sections/{b_sec.id}")
+    assert r.status_code == 200
+    html = r.text
+    assert 'id="topic-sidebar-root"' in html and 'hx-swap-oob="true"' in html
+    assert '<aside class="topic-sidebar"' not in html
+
+
 def test_put_section_rename(topic_with_sections: Topic, authenticated_client: TestClient, test_db: Session) -> None:
     authenticated_client.post(f"/topics/{topic_with_sections.id}/sections", data={"name": "OldSec"})
     sec = test_db.scalars(

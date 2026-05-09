@@ -11,11 +11,35 @@
         aria-label="Reorder entries"
         title="Drag to reorder"
       >⋮⋮</button>
-      <span class="entry-row__description-text">{{ entry.description }}</span>
+      <div class="entry-row__ellipsis-line">
+        <span class="entry-row__description-text">{{ entry.description }}</span>
+        {% if entry.description.strip() %}
+          <span class="entry-row__ellipsis-wrap">
+            <button type="button" class="entry-row__ellipsis-btn" aria-label="Show full description">
+              <span class="entry-row__ellipsis-btn-icon" aria-hidden="true">
+                <svg><use href="#sprite-icon-more-h"/></svg>
+              </span>
+            </button>
+            <div class="entry-row__ellipsis-tooltip" aria-hidden="true">{{ entry.description }}</div>
+          </span>
+        {% endif %}
+      </div>
     </div>
   </td>
   <td class="entry-row__command">
-    <code class="entry-row__code">{{ entry.command }}</code>
+    <div class="entry-row__ellipsis-line entry-row__ellipsis-line--cmd">
+      <code class="entry-row__code"><span class="entry-row__code-text">{{ entry.command }}</span></code>
+      {% if entry.command.strip() %}
+        <span class="entry-row__ellipsis-wrap">
+          <button type="button" class="entry-row__ellipsis-btn" aria-label="Show full command">
+            <span class="entry-row__ellipsis-btn-icon" aria-hidden="true">
+              <svg><use href="#sprite-icon-more-h"/></svg>
+            </span>
+          </button>
+            <div class="entry-row__ellipsis-tooltip entry-row__ellipsis-tooltip--cmd" aria-hidden="true">{{ entry.command }}</div>
+        </span>
+      {% endif %}
+    </div>
   </td>
   <td class="entry-row__actions">
     <div class="entry-row__actions-inner">

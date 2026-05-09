@@ -9,14 +9,16 @@
     hx-target="#section-{{ section.id }}"
     hx-swap="outerHTML"
   >
-    {% if not hide_section_chrome %}
     <label class="topic-section__edit-field">
       <span class="topic-section__edit-label">Section name</span>
-      <input type="text" name="name" value="{{ section.name or '' }}" maxlength="256" autofocus>
+      <input
+        type="text"
+        name="name"
+        value="{{ section.name or '' }}"
+        maxlength="256"
+        {% if hide_section_chrome %}placeholder="e.g. Install, cheatsheet…" {% endif %}autofocus
+      >
     </label>
-    {% else %}
-    <input type="hidden" name="name" value="">
-    {% endif %}
     <label class="topic-section__edit-field">
       <span class="topic-section__edit-label">Notes (optional)</span>
       <textarea name="notes" rows="3" maxlength="8000" placeholder="Warnings, tips, context…">{{ section.notes or '' }}</textarea>

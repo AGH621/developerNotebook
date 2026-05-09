@@ -562,7 +562,8 @@ a:focus-visible {
   gap: var(--space-1);
 }
 
-.add-form__label input {
+.add-form__label input,
+.add-form__label textarea {
   min-width: min(12rem, 100%);
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--color-border);
@@ -575,11 +576,19 @@ a:focus-visible {
     box-shadow var(--transition-fast);
 }
 
-.add-form__label input:hover {
+.add-form__label textarea {
+  resize: vertical;
+  min-height: 2.75rem;
+  line-height: 1.4;
+}
+
+.add-form__label input:hover,
+.add-form__label textarea:hover {
   border-color: var(--color-border-strong);
 }
 
-.add-form__label input:focus {
+.add-form__label input:focus,
+.add-form__label textarea:focus {
   outline: none;
   border-color: var(--color-primary);
   box-shadow: var(--input-focus-ring);
@@ -626,11 +635,16 @@ a:focus-visible {
   min-width: 0;
 }
 
-.entry-table__add-foot .add-form__label input {
+.entry-table__add-foot .add-form__label input,
+.entry-table__add-foot .add-form__label textarea {
   width: 100%;
   min-width: 0;
   min-height: 2.5rem;
   padding: 0.5rem 0.75rem;
+}
+
+.entry-table__add-foot .add-form__label textarea {
+  min-height: 4.25rem;
 }
 
 .entry-table__add-foot .add-form__submit {
@@ -1167,6 +1181,12 @@ a:focus-visible {
   letter-spacing: -0.01em;
 }
 
+.topic-section__title--placeholder {
+  font-weight: 600;
+  color: var(--color-muted);
+  font-style: italic;
+}
+
 .topic-section__actions {
   display: flex;
   flex-wrap: wrap;
@@ -1312,7 +1332,8 @@ a:focus-visible {
   min-width: 0;
 }
 
-.topic-footer__add-section .add-form__label input {
+.topic-footer__add-section .add-form__label input,
+.topic-footer__add-section .add-form__label textarea {
   width: 100%;
   min-width: 0;
 }
@@ -1338,7 +1359,7 @@ a:focus-visible {
 .entry-table td {
   border: 1px solid var(--color-border);
   padding: 0.55rem 0.75rem;
-  vertical-align: middle;
+  vertical-align: top;
 }
 
 .entry-table th {
@@ -1382,6 +1403,107 @@ a:focus-visible {
   text-align: center;
 }
 
+.entry-row__ellipsis-line {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* Wide layout: truncate control hidden; tooltip not used. Narrow layout restores in MQ below. */
+.entry-row__ellipsis-wrap {
+  display: none;
+  flex-shrink: 0;
+}
+
+.entry-row__ellipsis-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0.05rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  line-height: 0;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.entry-row__ellipsis-btn:hover {
+  background: var(--color-fill-hover);
+  color: var(--color-text);
+}
+
+.entry-row__ellipsis-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.entry-row__ellipsis-btn-icon {
+  display: block;
+}
+
+.entry-row__ellipsis-btn-icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Fixed + JS placement escapes .entry-table-wrap overflow clipping. */
+.entry-row__ellipsis-tooltip {
+  box-sizing: border-box;
+  position: fixed;
+  left: var(--entry-tip-left, auto);
+  top: var(--entry-tip-top, auto);
+  z-index: 10050;
+  min-width: 10rem;
+  max-width: min(22rem, calc(100vw - 20px));
+  max-height: min(50vh, 18rem);
+  overflow-y: auto;
+  margin: 0;
+  visibility: hidden;
+  opacity: 0;
+  padding: var(--space-2);
+  pointer-events: none;
+  font-size: var(--font-size-sm);
+  font-family: inherit;
+  color: var(--color-text);
+  line-height: 1.35;
+  text-align: left;
+  word-break: break-word;
+  white-space: pre-wrap;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0.55rem 1.25rem rgb(0 0 0 / 0.12);
+  transition:
+    opacity 140ms ease,
+    visibility 140ms linear;
+}
+
+.entry-row__ellipsis-tooltip.entry-row__ellipsis-tooltip--open {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.entry-row__ellipsis-tooltip--cmd {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entry-row__ellipsis-tooltip {
+    transition: none;
+  }
+}
+
 .entry-row__description {
   vertical-align: middle;
 }
@@ -1423,6 +1545,8 @@ a:focus-visible {
 .entry-row__description-text {
   flex: 1;
   min-width: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .entry-row__command {
@@ -1564,7 +1688,8 @@ a:focus-visible {
   margin-bottom: 0.25rem;
 }
 
-.entry-row__edit-field input {
+.entry-row__edit-field input,
+.entry-row__edit-field textarea {
   width: 100%;
   font: inherit;
   font-size: var(--font-size-sm);
@@ -1572,9 +1697,17 @@ a:focus-visible {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
+  box-sizing: border-box;
 }
 
-.entry-row__edit-field input:focus {
+.entry-row__edit-field textarea {
+  resize: vertical;
+  min-height: 6rem;
+  line-height: 1.4;
+}
+
+.entry-row__edit-field input:focus,
+.entry-row__edit-field textarea:focus {
   outline: none;
   border-color: var(--color-primary);
   box-shadow: var(--input-focus-ring);
@@ -1667,6 +1800,53 @@ a:focus-visible {
   .topic-card__actions {
     grid-column: 1 / -1;
     justify-content: flex-start;
+  }
+}
+
+@media (max-width: 720px) {
+  /* Single-line rows + ⋯ control; full text in hover/focus popup. */
+  .entry-row__ellipsis-line {
+    align-items: center;
+  }
+
+  .entry-row__ellipsis-wrap {
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-row__description-inner {
+    align-items: center;
+  }
+
+  .entry-row__description-text {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    word-break: normal;
+  }
+
+  .entry-row__ellipsis-line--cmd {
+    align-items: stretch;
+    gap: 0.2rem;
+  }
+
+  .entry-row__ellipsis-line--cmd .entry-row__code {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .entry-row__ellipsis-line--cmd .entry-row__code-text {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .entry-row__ellipsis-line--cmd .entry-row__ellipsis-wrap {
+    align-self: center;
   }
 }
 

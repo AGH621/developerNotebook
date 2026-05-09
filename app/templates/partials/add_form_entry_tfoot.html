@@ -3,27 +3,27 @@
 <td class="entry-table__col-desc">
   <label class="add-form__label">
     <span class="sr-only">{{ desc_label|default('Description') }}</span>
-    <input
-      type="text"
+    <textarea
       name="description"
       form="{{ fid }}"
+      rows="3"
       placeholder="{{ desc_placeholder|default('What it does') }}"
       maxlength="2048"
       autocomplete="off"
-    >
+    ></textarea>
   </label>
 </td>
 <td class="entry-table__col-cmd">
   <label class="add-form__label">
     <span class="sr-only">{{ cmd_label|default('Command') }}</span>
-    <input
-      type="text"
+    <textarea
       name="command"
       form="{{ fid }}"
+      rows="3"
       placeholder="{{ cmd_placeholder|default('Command') }}"
       maxlength="2048"
       autocomplete="off"
-    >
+    ></textarea>
   </label>
 </td>
 <td class="entry-table__col-actions">

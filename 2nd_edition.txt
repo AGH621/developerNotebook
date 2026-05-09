@@ -11,24 +11,29 @@ Second Edition
 3. ON HOLD: Postgres migration (for render.com)
 
 4. Style refinements
+	f. alphabetical listing of commands --> is this wise if each row of the table is a step in a larger process? (JK's git rebase directions)
+	k. dark mode
+	m. tweak the technology page icon button styling (needs refinements)
+
 	a. DONE: all buttons (incl "Copy") in 3rd column
 	b. DONE: first column cells should be same height as second column (use white space to achieve this)
-	c. allow lists in second column
+	c. DONE: allow lists in second column (also did first column)
 	d. DONE: have edit icon on cards that lead to rename and delete functions
 	e. DONE: eliminate section display on cards
-	f. alphabetical listing of commands
 	g. DONE: clean up in-page navigation
 	h. DONE: commands or command variables in unique color
 	i. DONE: narrow the margins in wide views
-	j. long commands have elipsis, which when clicked, reveal whole command in overlay (with appropriate buttons)
-	k. (needs work) dark mode
+	j. DONE: long commands have elipsis, which when clicked, reveal whole command in overlay (with appropriate buttons)
+	l. DONE: if a page has a single section table, name that table "Default" and allow user to edit it in the same way they do sections they have created.
 
 5. Features
+	e. if there is a list of commands in a single cell, can we have separate copy buttons for each? --> too busy?
+	b. index of all commands on a single page (how?)
+	
 	a. search all commands & within a technology page (semantic search?)
-	b. index of all commands on a single page (by function?)
 	c. automatic alphabetizing of new cards
-	d. in page navigation for all pages with >1 section (add immediate when new section is added)
-	e. if there is a list of commands in a single cell, can we have separate copy buttons for each?
+	d. DONE: in page navigation for all pages with >1 section (add immediate when new section is added)
+
 	f. for commands that need variables: select a command, textbox overlay to compose exactly what is wanted (variables, etc.), textbox has copy button, close button (or click away to close) [otherwise straight copy is ok]
 	g. user sets command variables temporarily? (have a default)
 	h. allow user to choose which technologies to seed with

@@ -13,11 +13,11 @@
       <div class="entry-row__edit-grid">
         <label class="entry-row__edit-field">
           <span class="entry-row__edit-label">Description</span>
-          <input type="text" name="description" value="{{ entry.description }}" maxlength="2048" autocomplete="off" autofocus>
+          <textarea name="description" rows="5" maxlength="2048" autocomplete="off" autofocus>{{ entry.description }}</textarea>
         </label>
         <label class="entry-row__edit-field">
           <span class="entry-row__edit-label">Command</span>
-          <input type="text" name="command" value="{{ entry.command }}" maxlength="2048" autocomplete="off">
+          <textarea name="command" rows="5" maxlength="2048" autocomplete="off">{{ entry.command }}</textarea>
         </label>
       </div>
       <div class="entry-row__edit-actions">

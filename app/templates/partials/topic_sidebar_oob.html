@@ -1,0 +1,6 @@
+{# Out-of-band; syncs sidebar when section list / names change via HTMX. #}
+<div id="topic-sidebar-root" hx-swap-oob="true">
+  {% if show_section_sidebar %}
+    {% include "partials/topic_sidebar_inner.html" %}
+  {% endif %}
+</div>
