@@ -5,7 +5,8 @@ Second Edition
 	b. delete user
 	c. user stats
 	d. change password
-	e. add commands/technologies to the seed material
+	
+	e. add/modify commands/technologies to the seed material
 
 2. Modify authorization: Users are by invitation only
 
@@ -32,11 +33,11 @@ Second Edition
 	b. OPUS PLAN REQUIRED: index of all commands on a single page (how?)
 	a. OPUS PLAN REQUIRED: search all commands & within a technology page (semantic search?)
 	
-	f. for commands that need variables: select a command, textbox overlay to compose exactly what is wanted (variables, etc.), textbox has copy button, close button (or click away to close) [otherwise straight copy is ok]
-	g. user sets command variables temporarily? (have a default)
+	c. POSTPONE: automatic alphabetizing of new cards --> prevents user from ordering cards
+	f. POSTPONE: for commands that need variables: select a command, textbox overlay to compose exactly what is wanted (variables, etc.), textbox has copy button, close button (or click away to close) [otherwise straight copy is ok]
+		i. difficult because users may not use <> to indicate variables
+	g. POSTPONE: user sets command variables temporarily? (have a default)
 
-	
-	c. NOT DOING: automatic alphabetizing of new cards --> prevents user from ordering cards
 	d. DONE: in page navigation for all pages with >1 section (add immediate when new section is added)
 	h. DONE: allow user to choose which technologies to seed with
 	i. DONE: add additional seeds after account creation
