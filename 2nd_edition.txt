@@ -1,25 +1,14 @@
 Second Edition
 
-1. PLANNED: Admin console
-	a. add user (invitation only)
-	b. delete user
-	c. change password
-	d. add/modify commands/technologies to the seed material
-		i. retire the docx source?
-
-2. POSTPONE: Postgres migration (for render.com)
+1. Admin console
+	e. allow user to request an invitation via email (see pinned Cursor chat)
 
 3. Style refinements
-	f. alphabetical listing of commands --> is this wise if each row of the table is a step in a larger process? (JK's git rebase directions)
 	k. dark mode
-	m. redesign the technology page icon buttons --> too busy
 
 4. Features
 	j. user reset own password
 	e. if there is a list of commands in a single cell, can we have separate copy buttons for each? --> too busy?
-
-	b. OPUS PLAN REQUIRED: index of all commands on a single page (how?)
-	a. OPUS PLAN REQUIRED: search all commands & within a technology page (semantic search?)
 	
 	f. POSTPONE: for commands that need variables: select a command, textbox overlay to compose exactly what is wanted (variables, etc.), textbox has copy button, close button (or click away to close) [otherwise straight copy is ok]
 		i. difficult because users may not use <> to indicate variables --> offer as default to all commands?
