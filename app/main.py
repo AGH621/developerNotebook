@@ -5,10 +5,15 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.database import Base, engine
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(_PROJECT_ROOT / ".env")
+
+from app.bootstrap import run_startup_tasks
+from app.database import Base, SessionLocal, apply_sqlite_user_column_migrations, engine
 
 logging.basicConfig(
     level=getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), logging.INFO),
@@ -21,11 +26,21 @@ _APP_DIR = Path(__file__).resolve().parent
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Create database tables on startup."""
+    """Create database tables on startup and run bootstrap tasks."""
     import app.models  # noqa: F401 — registers models on Base.metadata
 
     Base.metadata.create_all(bind=engine)
+    apply_sqlite_user_column_migrations(engine)
     logger.info("Database tables ensured (create_all).")
+    db = SessionLocal()
+    try:
+        run_startup_tasks(db)
+        db.commit()
+    except BaseException:
+        db.rollback()
+        raise
+    finally:
+        db.close()
     yield
 
 
@@ -35,9 +50,11 @@ def create_app(*, enable_lifespan: bool = True) -> FastAPI:
     Parameters
     ----------
     enable_lifespan : bool
-        When ``True`` (production), run ``create_all`` on the process SQLite
-        engine at startup. When ``False`` (tests), skip startup DB side effects
-        so dependency overrides can use an isolated in-memory session.
+        When ``True`` (production), run ``create_all``, SQLite user-column
+        migrations, and bootstrap tasks (admin from env variables, starter
+        catalog seed) on the app's SQLite engine at startup. When ``False``
+        (tests), skip startup side effects so dependency overrides can use an
+        isolated in-memory session.
 
     Returns
     -------
@@ -53,9 +70,10 @@ def create_app(*, enable_lifespan: bool = True) -> FastAPI:
 
     application.mount("/static", StaticFiles(directory=str(_APP_DIR / "static")), name="static")
 
-    from app.routes import entries, pages, sections, topics
+    from app.routes import admin, entries, pages, sections, topics
 
     application.include_router(pages.router)
+    application.include_router(admin.router)
     application.include_router(topics.router)
     application.include_router(sections.router)
     application.include_router(entries.router)

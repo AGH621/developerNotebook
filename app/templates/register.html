@@ -6,7 +6,9 @@
   {% if error %}
   <p class="auth-panel__error" role="alert">{{ error }}</p>
   {% endif %}
+  {% if show_register_form %}
   <form method="post" action="/register" class="auth-form">
+    <input type="hidden" name="invite_code" value="{{ invite_code }}">
     <label class="auth-form__field">
       <span>Username</span>
       <input name="username" type="text" required autocomplete="username" maxlength="150">
@@ -17,6 +19,7 @@
     </label>
     <button type="submit" class="auth-form__submit">Create account</button>
   </form>
+  {% endif %}
   <p class="auth-panel__footer"><a href="/login">Already have an account? Log in</a></p>
 </section>
 {% endblock %}

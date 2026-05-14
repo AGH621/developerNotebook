@@ -41,6 +41,9 @@
       </button>
     </div>
     {% if user %}
+    {% if user.is_admin %}
+    <a href="/admin" class="site-nav__admin">Admin</a>
+    {% endif %}
     <a href="/seed-topics" class="site-nav__seed">Add cheatsheets</a>
     <span class="site-nav__user">{{ user.username }}</span>
     <form method="post" action="/logout" class="site-nav__logout">

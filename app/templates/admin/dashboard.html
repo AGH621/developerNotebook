@@ -1,0 +1,33 @@
+{% extends "admin/layout.html" %}
+{% block title %}Admin — Users{% endblock %}
+{% block admin_nav_users %}admin-tabs__link--active{% endblock %}
+{% block admin_body %}
+<h1 class="admin-heading">Users</h1>
+<p class="admin-lede">Suspend accounts to block login, delete to remove notebooks, or assign a new password.</p>
+
+{% if ok_message %}
+<p class="admin-flash admin-flash--ok" role="status">{{ ok_message }}</p>
+{% endif %}
+{% if error %}
+<p class="admin-flash admin-flash--err" role="alert">{{ error }}</p>
+{% endif %}
+
+<div class="admin-table-scroll">
+<table class="admin-table admin-table--users">
+  <thead>
+    <tr>
+      <th scope="col">Username</th>
+      <th scope="col">Roles</th>
+      <th scope="col">Status</th>
+      <th scope="col">Topics</th>
+      <th scope="col">Actions</th>
+    </tr>
+  </thead>
+  <tbody id="admin-user-rows">
+    {% for row in user_rows %}
+    {% include "admin/partials/user_row.html" %}
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

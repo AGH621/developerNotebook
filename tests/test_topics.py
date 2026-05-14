@@ -59,7 +59,7 @@ def test_put_topics_reorder(authenticated_client: TestClient, test_db: Session) 
     assert [t.id for t in fresh] == rev
 
 
-def test_user_cannot_access_other_users_topic(client: TestClient, test_db: Session) -> None:
+def test_user_cannot_access_other_users_topic(client: TestClient, test_db: Session, register_invite: str) -> None:
     u1 = User(username="alice", password_hash=hash_password("a"))
     test_db.add(u1)
     test_db.commit()
@@ -69,13 +69,16 @@ def test_user_cannot_access_other_users_topic(client: TestClient, test_db: Sessi
     test_db.add(Section(topic_id=topic.id, name=None, display_order=0, notes=None))
     test_db.commit()
 
-    client.post("/register", data={"username": "bob", "password": TEST_PASSWORD})
+    client.post(
+        "/register",
+        data={"username": "bob", "password": TEST_PASSWORD, "invite_code": register_invite},
+    )
     r = client.put(f"/topics/{topic.id}", data={"name": "Hack"})
     assert r.status_code == 404
 
 
 @pytest.fixture
-def two_users_clients(client: TestClient, test_db: Session):
+def two_users_clients(client: TestClient, test_db: Session, register_invite: str):
     """Client logged in as bob2; alice2 owns a topic bob2 must not modify."""
     alice = User(username="alice2", password_hash=hash_password("a"))
     test_db.add(alice)
@@ -83,7 +86,10 @@ def two_users_clients(client: TestClient, test_db: Session):
     topic = Topic(user_id=alice.id, name="Alone", slug="alone", display_order=0)
     test_db.add(topic)
     test_db.commit()
-    client.post("/register", data={"username": "bob2", "password": "pw"})
+    client.post(
+        "/register",
+        data={"username": "bob2", "password": "pw", "invite_code": register_invite},
+    )
     return client, topic.id
 
 

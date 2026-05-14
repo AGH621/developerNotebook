@@ -127,8 +127,8 @@ def get_current_user(request: Request, db: Session) -> User | None:
     Returns
     -------
     User or None
-        The user when the cookie is present, well-formed, and refers to an
-        existing row; otherwise ``None``.
+        The user when the cookie is present, well-formed, refers to an
+        existing row, and the account is not suspended; otherwise ``None``.
     """
     raw = request.cookies.get(SESSION_COOKIE_NAME)
     if not raw:
@@ -144,6 +144,10 @@ def get_current_user(request: Request, db: Session) -> User | None:
     user = db.scalars(select(User).where(User.id == user_id)).first()
     if user is None:
         logger.debug("Session references missing user id=%s", user_id)
+        return None
+    if user.is_suspended:
+        logger.info("Session denied for suspended user id=%s", user_id)
+        return None
     return user
 
 
@@ -177,4 +181,17 @@ def require_auth(
             detail="Not authenticated",
             headers={"Location": "/login"},
         )
+    return user
+
+
+def require_admin(user: User = Depends(require_auth)) -> User:
+    """FastAPI dependency: require an authenticated admin session.
+
+    Raises
+    ------
+    HTTPException
+        **403** when the user is not an administrator.
+    """
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required.")
     return user

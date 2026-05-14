@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
+from datetime import datetime
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -19,6 +21,10 @@ class User(Base):
         Unique login name.
     password_hash : str
         Bcrypt hash of the user's password.
+    is_admin : bool
+        Whether the account may access the admin suite.
+    is_suspended : bool
+        When true, login is denied for this account.
     topics : list of Topic
         Topics belonging to this user, ordered by application logic.
     """
@@ -28,6 +34,8 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     username: Mapped[str] = mapped_column(String(150), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_suspended: Mapped[bool] = mapped_column(Boolean, default=False)
 
     topics: Mapped[list[Topic]] = relationship(
         back_populates="user",
@@ -142,3 +150,79 @@ class Entry(Base):
     display_order: Mapped[int] = mapped_column(default=0)
 
     section: Mapped[Section] = relationship(back_populates="entries")
+
+
+class Invitation(Base):
+    """Single-use invite code for closed registration."""
+
+    __tablename__ = "invitations"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    code: Mapped[str] = mapped_column(String(96), unique=True, index=True)
+    created_by: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    used_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    creator: Mapped[User] = relationship(foreign_keys=[created_by])
+    redeemed_by_user: Mapped[User | None] = relationship(foreign_keys=[used_by])
+
+
+class StarterTopic(Base):
+    """Global template topic for onboarding (not tied to a user)."""
+
+    __tablename__ = "starter_topics"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(256))
+    display_order: Mapped[int] = mapped_column(default=0)
+
+    sections: Mapped[list[StarterSection]] = relationship(
+        back_populates="topic",
+        cascade="all, delete-orphan",
+    )
+
+
+class StarterSection(Base):
+    """Section row inside the starter catalog."""
+
+    __tablename__ = "starter_sections"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    topic_id: Mapped[int] = mapped_column(
+        ForeignKey("starter_topics.id", ondelete="CASCADE"),
+        index=True,
+    )
+    name: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    display_order: Mapped[int] = mapped_column(default=0)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    topic: Mapped[StarterTopic] = relationship(back_populates="sections")
+    entries: Mapped[list[StarterEntry]] = relationship(
+        back_populates="section",
+        cascade="all, delete-orphan",
+    )
+
+
+class StarterEntry(Base):
+    """Command row inside a starter catalog section."""
+
+    __tablename__ = "starter_entries"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    section_id: Mapped[int] = mapped_column(
+        ForeignKey("starter_sections.id", ondelete="CASCADE"),
+        index=True,
+    )
+    description: Mapped[str] = mapped_column(Text)
+    command: Mapped[str] = mapped_column(Text)
+    display_order: Mapped[int] = mapped_column(default=0)
+
+    section: Mapped[StarterSection] = relationship(back_populates="entries")

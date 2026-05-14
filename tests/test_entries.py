@@ -101,7 +101,7 @@ def test_put_entries_reorder(section_with_entries: Section, authenticated_client
     assert [e.id for e in fresh] == rev
 
 
-def test_entry_foreign_user_forbidden(client: TestClient, test_db: Session) -> None:
+def test_entry_foreign_user_forbidden(client: TestClient, test_db: Session, register_invite: str) -> None:
     owner = User(username="ent-owner", password_hash=hash_password("a"))
     test_db.add(owner)
     test_db.commit()
@@ -115,6 +115,9 @@ def test_entry_foreign_user_forbidden(client: TestClient, test_db: Session) -> N
     test_db.add(entry)
     test_db.commit()
 
-    client.post("/register", data={"username": "ent-intruder", "password": TEST_PASSWORD})
+    client.post(
+        "/register",
+        data={"username": "ent-intruder", "password": TEST_PASSWORD, "invite_code": register_invite},
+    )
     r = client.put(f"/entries/{entry.id}", data={"description": "z", "command": "z"})
     assert r.status_code == 404

@@ -1,0 +1,43 @@
+{% extends "admin/layout.html" %}
+{% block title %}Admin — Invitations{% endblock %}
+{% block admin_nav_invites %}admin-tabs__link--active{% endblock %}
+{% block admin_body %}
+<h1 class="admin-heading">Invitations</h1>
+<p class="admin-lede">Share a single-use signup link only with people who should receive an account.</p>
+
+{% if new_invite_link %}
+<p class="admin-flash admin-flash--ok" role="status">New invitation — copy link:</p>
+<p class="admin-invite-link"><code>{{ new_invite_link }}</code></p>
+{% endif %}
+{% if ok_message %}
+<p class="admin-flash admin-flash--ok" role="status">{{ ok_message }}</p>
+{% endif %}
+{% if error %}
+<p class="admin-flash admin-flash--err" role="alert">{{ error }}</p>
+{% endif %}
+
+<form method="post" action="/admin/invites" class="admin-toolbar">
+  <button type="submit" class="admin-btn admin-btn--primary">Generate invitation</button>
+</form>
+
+<div class="admin-table-scroll">
+<table class="admin-table">
+  <thead>
+    <tr>
+      <th scope="col">Code</th>
+      <th scope="col">Signup link</th>
+      <th scope="col">Created by</th>
+      <th scope="col">Status</th>
+      <th scope="col"></th>
+    </tr>
+  </thead>
+  <tbody id="admin-invite-rows">
+    {% for inv in invitations %}
+    {% include "admin/partials/invite_row.html" %}
+    {% else %}
+    <tr><td colspan="5" class="admin-muted admin-table__empty">No invitations yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

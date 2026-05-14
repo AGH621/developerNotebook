@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Topic, User
 from app.seed_data import STARTER_DATA
+from app.services.seed import starter_catalog_topic_count
 
 
 def test_home_lists_topic_cards(seeded_client: TestClient, test_db: Session) -> None:
@@ -29,42 +30,68 @@ def test_topic_page_with_slug(seeded_client: TestClient, test_db: Session) -> No
     assert topic.name.encode() in r.content
 
 
-def test_welcome_get_after_register(client: TestClient, test_db: Session) -> None:
-    client.post("/register", data={"username": "wel", "password": "pw"})
+def test_welcome_get_after_register(client: TestClient, test_db: Session, register_invite: str) -> None:
+    client.post(
+        "/register",
+        data={"username": "wel", "password": "pw", "invite_code": register_invite},
+    )
     r = client.get("/welcome")
     assert r.status_code == 200
     assert b"Welcome" in r.content
     assert b"Seed selected topics" in r.content
 
 
-def test_welcome_post_template_seeds(client: TestClient, test_db: Session) -> None:
-    client.post("/register", data={"username": "tpl", "password": "pw"})
-    data = {"choice": "template", "topic": [str(i) for i in range(len(STARTER_DATA))]}
+def test_welcome_post_template_seeds(
+    client: TestClient,
+    test_db: Session,
+    register_invite: str,
+    starter_catalog: None,
+) -> None:
+    client.post(
+        "/register",
+        data={"username": "tpl", "password": "pw", "invite_code": register_invite},
+    )
+    n = starter_catalog_topic_count(test_db)
+    data = {"choice": "template", "topic": [str(i) for i in range(n)]}
     r = client.post("/welcome", data=data, follow_redirects=False)
     assert r.status_code == 303
     assert r.headers.get("location") == "/"
     user = test_db.scalars(select(User).where(User.username == "tpl")).one()
-    assert test_db.scalar(select(func.count(Topic.id)).where(Topic.user_id == user.id)) == len(STARTER_DATA)
+    assert test_db.scalar(select(func.count(Topic.id)).where(Topic.user_id == user.id)) == n
 
 
-def test_welcome_post_template_subset(client: TestClient, test_db: Session) -> None:
-    client.post("/register", data={"username": "sub", "password": "pw"})
+def test_welcome_post_template_subset(
+    client: TestClient,
+    test_db: Session,
+    register_invite: str,
+    starter_catalog: None,
+) -> None:
+    client.post(
+        "/register",
+        data={"username": "sub", "password": "pw", "invite_code": register_invite},
+    )
     r = client.post("/welcome", data={"choice": "template", "topic": "0"}, follow_redirects=False)
     assert r.status_code == 303
     user = test_db.scalars(select(User).where(User.username == "sub")).one()
     assert test_db.scalar(select(func.count(Topic.id)).where(Topic.user_id == user.id)) == 1
 
 
-def test_welcome_post_template_requires_topic(client: TestClient, test_db: Session) -> None:
-    client.post("/register", data={"username": "needtp", "password": "pw"})
+def test_welcome_post_template_requires_topic(client: TestClient, test_db: Session, register_invite: str) -> None:
+    client.post(
+        "/register",
+        data={"username": "needtp", "password": "pw", "invite_code": register_invite},
+    )
     r = client.post("/welcome", data={"choice": "template"}, follow_redirects=False)
     assert r.status_code == 400
     user = test_db.scalars(select(User).where(User.username == "needtp")).one()
     assert test_db.scalar(select(func.count(Topic.id)).where(Topic.user_id == user.id)) == 0
 
 
-def test_welcome_post_blank_skips_seed(client: TestClient, test_db: Session) -> None:
-    client.post("/register", data={"username": "blk", "password": "pw"})
+def test_welcome_post_blank_skips_seed(client: TestClient, test_db: Session, register_invite: str) -> None:
+    client.post(
+        "/register",
+        data={"username": "blk", "password": "pw", "invite_code": register_invite},
+    )
     r = client.post("/welcome", data={"choice": "blank"}, follow_redirects=False)
     assert r.status_code == 303
     assert r.headers.get("location") == "/"
@@ -72,17 +99,28 @@ def test_welcome_post_blank_skips_seed(client: TestClient, test_db: Session) -> 
     assert test_db.scalar(select(func.count(Topic.id)).where(Topic.user_id == user.id)) == 0
 
 
-def test_seed_topics_get_ok_when_authenticated(client: TestClient, test_db: Session) -> None:
-    client.post("/register", data={"username": "seedpg", "password": "pw"})
+def test_seed_topics_get_ok_when_authenticated(client: TestClient, test_db: Session, register_invite: str) -> None:
+    client.post(
+        "/register",
+        data={"username": "seedpg", "password": "pw", "invite_code": register_invite},
+    )
     r = client.get("/seed-topics")
     assert r.status_code == 200
     assert b"Add starter cheatsheets" in r.content
 
 
-def test_seed_topics_post_appends_new_topic(client: TestClient, test_db: Session) -> None:
+def test_seed_topics_post_appends_new_topic(
+    client: TestClient,
+    test_db: Session,
+    register_invite: str,
+    starter_catalog: None,
+) -> None:
     if len(STARTER_DATA) < 2:
         pytest.skip("needs multiple starter topics")
-    client.post("/register", data={"username": "apd", "password": "pw"})
+    client.post(
+        "/register",
+        data={"username": "apd", "password": "pw", "invite_code": register_invite},
+    )
     user = test_db.scalars(select(User).where(User.username == "apd")).one()
     existing_name = str(STARTER_DATA[0]["name"])
     test_db.add(

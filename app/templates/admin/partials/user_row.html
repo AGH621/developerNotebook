@@ -1,0 +1,36 @@
+{% set u = row.user %}
+<tr id="admin-user-{{ u.id }}" class="admin-user-row">
+  <td>{{ u.username }}</td>
+  <td>
+    {% if u.is_admin %}
+    <span class="admin-badge admin-badge--admin">Admin</span>
+    {% else %}
+    <span class="admin-muted">—</span>
+    {% endif %}
+  </td>
+  <td>
+    {% if u.is_suspended %}
+    <span class="admin-badge admin-badge--suspend">Suspended</span>
+    {% else %}
+    <span class="admin-badge admin-badge--ok">Active</span>
+    {% endif %}
+  </td>
+  <td>{{ row.topic_count }}</td>
+  <td>
+    <div class="admin-actions">
+    {% if row.is_self %}
+    <span class="admin-muted" title="You cannot apply these actions to your own signed-in session on this row.">—</span>
+    {% else %}
+    <form method="post" action="/admin/users/{{ u.id }}/suspend" class="admin-inline-form">
+      <button type="submit" class="admin-btn admin-btn--secondary admin-btn--small">{{ 'Unsuspend' if u.is_suspended else 'Suspend' }}</button>
+    </form>
+    <form method="post" action="/admin/users/{{ u.id }}/delete"
+          class="admin-inline-form"
+          onsubmit="return confirm('Delete {{ u.username }} and all notebooks?');">
+      <button type="submit" class="admin-btn admin-btn--danger admin-btn--small">Delete</button>
+    </form>
+    <a href="/admin/users/{{ u.id }}/password" class="admin-btn-link">Password</a>
+    {% endif %}
+    </div>
+  </td>
+</tr>

@@ -1,0 +1,25 @@
+{% extends "admin/layout.html" %}
+{% block title %}Admin — Starter catalog{% endblock %}
+{% block admin_nav_starter %}admin-tabs__link--active{% endblock %}
+{% block admin_body %}
+<h1 class="admin-heading">Starter catalog</h1>
+<p class="admin-lede">These topics mirror what appears on onboarding and “Add cheatsheets.” Edit names, sections, and sample commands.</p>
+
+{% if ok_message %}
+<p class="admin-flash admin-flash--ok" role="status">{{ ok_message }}</p>
+{% endif %}
+{% if error %}
+<p class="admin-flash admin-flash--err" role="alert">{{ error }}</p>
+{% endif %}
+
+<form class="admin-toolbar" method="post" action="/admin/starter/topics" hx-post="/admin/starter/topics" hx-indicator="closest form">
+  <input type="text" name="name" placeholder="New starter topic title" maxlength="256" autocomplete="off" class="admin-text-input">
+  <button type="submit" class="admin-btn admin-btn--primary">Add topic</button>
+</form>
+
+<div class="admin-starter-list" id="admin-starter-list">
+  {% for topic in starter_topics %}
+  {% include "admin/partials/starter_topic_card.html" %}
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,24 @@
+<article class="admin-card admin-starter-card" id="admin-starter-topic-{{ topic.id }}">
+  <header class="admin-starter-card__head">
+    <form class="admin-inline-row" hx-put="/admin/starter/topics/{{ topic.id }}" hx-indicator="closest form">
+      <input type="text" name="name" value="{{ topic.name }}" maxlength="256" class="admin-text-input admin-text-input--grow" autocomplete="off">
+      <button type="submit" class="admin-btn admin-btn--secondary">Save name</button>
+    </form>
+    <div class="admin-starter-card__actions">
+      <button type="button" class="admin-btn admin-btn--danger admin-btn--small"
+        hx-delete="/admin/starter/topics/{{ topic.id }}"
+        hx-confirm="Delete starter topic {{ topic.name }} and all sections and commands?">
+        Delete topic
+      </button>
+    </div>
+  </header>
+
+  <form class="admin-add-row" method="post" action="/admin/starter/topics/{{ topic.id }}/sections" hx-post="/admin/starter/topics/{{ topic.id }}/sections">
+    <input type="text" name="name" placeholder="Section title (optional)" maxlength="256" autocomplete="off" class="admin-text-input admin-text-input--grow">
+    <button type="submit" class="admin-btn admin-btn--secondary admin-btn--small">Add section</button>
+  </form>
+
+  {% for section in topic.sections %}
+  {% include "admin/partials/starter_section.html" %}
+  {% endfor %}
+</article>

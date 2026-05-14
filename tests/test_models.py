@@ -8,7 +8,16 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import hash_password
-from app.models import Entry, Section, Topic, User
+from app.models import (
+    Entry,
+    Invitation,
+    Section,
+    StarterEntry,
+    StarterSection,
+    StarterTopic,
+    Topic,
+    User,
+)
 
 
 def test_user_topic_section_entry_chain(test_db: Session):
@@ -105,3 +114,61 @@ def test_topic_slug_unique_per_user(test_db: Session):
     test_db.add(Topic(user_id=user.id, name="B", slug="dup", display_order=1))
     with pytest.raises(IntegrityError):
         test_db.commit()
+
+
+def test_user_admin_flags_default_false(test_db: Session):
+    user = User(username="plain", password_hash=hash_password("x"))
+    test_db.add(user)
+    test_db.commit()
+    loaded = test_db.scalars(select(User).where(User.id == user.id)).one()
+    assert loaded.is_admin is False
+    assert loaded.is_suspended is False
+
+
+def test_invitation_created_and_redeemed_by_users(test_db: Session):
+    admin = User(username="inviter", password_hash=hash_password("a"))
+    test_db.add(admin)
+    test_db.flush()
+    inv = Invitation(code="invite-token-xyz", created_by=admin.id)
+    test_db.add(inv)
+    test_db.commit()
+
+    newcomer = User(username="joiner", password_hash=hash_password("b"))
+    test_db.add(newcomer)
+    test_db.flush()
+    inv.used_by = newcomer.id
+    test_db.commit()
+
+    row = test_db.scalars(select(Invitation).where(Invitation.id == inv.id)).one()
+    assert row.creator.username == "inviter"
+    assert row.redeemed_by_user is not None
+    assert row.redeemed_by_user.username == "joiner"
+
+
+def test_cascade_delete_starter_topic_removes_sections_and_entries(test_db: Session):
+    topic = StarterTopic(name="T", display_order=0)
+    test_db.add(topic)
+    test_db.flush()
+    section = StarterSection(topic_id=topic.id, name="S", display_order=0)
+    test_db.add(section)
+    test_db.flush()
+    test_db.add(
+        StarterEntry(
+            section_id=section.id,
+            description="d",
+            command="c",
+            display_order=0,
+        ),
+    )
+    test_db.commit()
+    tid, sid = topic.id, section.id
+
+    test_db.delete(topic)
+    test_db.commit()
+
+    assert test_db.scalars(select(StarterSection).where(StarterSection.id == sid)).first() is None
+    assert (
+        test_db.scalars(select(StarterEntry).where(StarterEntry.section_id == sid)).first()
+        is None
+    )
+    assert test_db.scalars(select(StarterTopic).where(StarterTopic.id == tid)).first() is None

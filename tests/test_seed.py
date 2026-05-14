@@ -8,16 +8,17 @@ from sqlalchemy.orm import Session
 
 from app.auth import hash_password
 from app.models import Entry, Section, Topic, User
-from app.seed_data import STARTER_DATA, starter_topics_meta
+from app.seed_data import STARTER_DATA
 from app.services.seed import (
     populate_starter_data,
     starter_topic_indices_available,
     starter_topics_for_user,
+    starter_topics_meta,
 )
 
 
-def test_starter_topics_meta_sorted_by_name():
-    meta = starter_topics_meta()
+def test_starter_topics_meta_sorted_by_name(test_db: Session, starter_catalog: None):
+    meta = starter_topics_meta(test_db)
     names = [str(m["name"]) for m in meta]
     assert names == sorted(names, key=str.casefold)
 
@@ -29,7 +30,7 @@ def _expected_counts(data: list[dict]) -> tuple[int, int, int]:
     return n_topics, n_sections, n_entries
 
 
-def test_populate_respects_topic_indices(test_db: Session):
+def test_populate_respects_topic_indices(starter_catalog: None, test_db: Session):
     user = User(username="subset", password_hash=hash_password("x"))
     test_db.add(user)
     test_db.commit()
@@ -42,7 +43,7 @@ def test_populate_respects_topic_indices(test_db: Session):
     assert counts["entries"] == exp_e
 
 
-def test_populate_with_display_order_start(test_db: Session):
+def test_populate_with_display_order_start(starter_catalog: None, test_db: Session):
     user = User(username="ordstart", password_hash=hash_password("x"))
     test_db.add(user)
     test_db.commit()
@@ -54,7 +55,7 @@ def test_populate_with_display_order_start(test_db: Session):
     assert topic.display_order == 7
 
 
-def test_starter_topics_for_user_marks_existing(test_db: Session):
+def test_starter_topics_for_user_marks_existing(starter_catalog: None, test_db: Session):
     user = User(username="metausr", password_hash=hash_password("x"))
     test_db.add(user)
     test_db.commit()
@@ -68,7 +69,7 @@ def test_starter_topics_for_user_marks_existing(test_db: Session):
     assert match["already_have"] is True
 
 
-def test_starter_topic_indices_available_excludes_existing(test_db: Session):
+def test_starter_topic_indices_available_excludes_existing(starter_catalog: None, test_db: Session):
     user = User(username="avail", password_hash=hash_password("x"))
     test_db.add(user)
     test_db.commit()
@@ -83,7 +84,7 @@ def test_starter_topic_indices_available_excludes_existing(test_db: Session):
         assert 1 in avail
 
 
-def test_populate_creates_expected_rows(test_db: Session):
+def test_populate_creates_expected_rows(starter_catalog: None, test_db: Session):
     user = User(username="seedme", password_hash=hash_password("x"))
     test_db.add(user)
     test_db.commit()
@@ -112,7 +113,7 @@ def test_populate_creates_expected_rows(test_db: Session):
     )
 
 
-def test_seeded_topics_have_slug_and_display_order(test_db: Session):
+def test_seeded_topics_have_slug_and_display_order(starter_catalog: None, test_db: Session):
     user = User(username="ord", password_hash=hash_password("x"))
     test_db.add(user)
     test_db.commit()
@@ -125,7 +126,7 @@ def test_seeded_topics_have_slug_and_display_order(test_db: Session):
         assert " " not in t.slug
 
 
-def test_at_least_one_topic_has_only_default_section(test_db: Session):
+def test_at_least_one_topic_has_only_default_section(starter_catalog: None, test_db: Session):
     user = User(username="blanktopic", password_hash=hash_password("x"))
     test_db.add(user)
     test_db.commit()
@@ -138,7 +139,7 @@ def test_at_least_one_topic_has_only_default_section(test_db: Session):
     )
 
 
-def test_seeding_isolated_per_user(test_db: Session):
+def test_seeding_isolated_per_user(starter_catalog: None, test_db: Session):
     u1 = User(username="s1", password_hash=hash_password("a"))
     u2 = User(username="s2", password_hash=hash_password("b"))
     test_db.add_all([u1, u2])

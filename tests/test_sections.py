@@ -132,7 +132,7 @@ def test_put_sections_reorder(topic_with_sections: Topic, authenticated_client: 
     assert [s.id for s in fresh] == rev
 
 
-def test_section_foreign_user_forbidden(client: TestClient, test_db: Session) -> None:
+def test_section_foreign_user_forbidden(client: TestClient, test_db: Session, register_invite: str) -> None:
     owner = User(username="sec-owner", password_hash=hash_password("a"))
     test_db.add(owner)
     test_db.commit()
@@ -143,6 +143,9 @@ def test_section_foreign_user_forbidden(client: TestClient, test_db: Session) ->
     test_db.add(section)
     test_db.commit()
 
-    client.post("/register", data={"username": "sec-intruder", "password": TEST_PASSWORD})
+    client.post(
+        "/register",
+        data={"username": "sec-intruder", "password": TEST_PASSWORD, "invite_code": register_invite},
+    )
     r = client.put(f"/sections/{section.id}", data={"name": "X", "notes": ""})
     assert r.status_code == 404

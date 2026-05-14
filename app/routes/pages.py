@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -21,11 +22,11 @@ from app.auth import (
     verify_password,
 )
 from app.database import get_db
-from app.models import Section, Topic, User
+from app.models import Invitation, Section, Topic, User
 from app.routes.sections import _topic_context_flags
-from app.seed_data import STARTER_DATA
 from app.services.seed import (
     populate_starter_data,
+    starter_catalog_topic_count,
     starter_topic_indices_available,
     starter_topics_for_user,
 )
@@ -221,6 +222,18 @@ async def login_post(
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
 
+    if row.is_suspended:
+        auth_log.warning("Login blocked suspended username=%s user_id=%s", name, row.id)
+        return templates.TemplateResponse(
+            request,
+            "login.html",
+            {
+                "error": "This account has been suspended. Contact an administrator.",
+                "user": None,
+            },
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
     auth_log.info("Login succeeded username=%s user_id=%s", name, row.id)
     response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
     create_session(response, row.id)
@@ -228,8 +241,12 @@ async def login_post(
 
 
 @router.get("/register")
-async def register_get(request: Request, db: Session = Depends(get_db)):
-    """Show the registration form.
+async def register_get(
+    request: Request,
+    db: Session = Depends(get_db),
+    code: Annotated[str | None, Query()] = None,
+):
+    """Show the registration form when ``?code=`` matches an unused invitation.
 
     Parameters
     ----------
@@ -237,22 +254,65 @@ async def register_get(request: Request, db: Session = Depends(get_db)):
         Incoming HTTP request.
     db : Session
         Database session for optional session lookup.
+    code : str or None
+        Invitation token from ``/register?code=…``.
 
     Returns
     -------
     TemplateResponse
-        Rendered ``register.html``.
+        Rendered ``register.html`` with or without the signup form.
     RedirectResponse
         Redirects to ``/`` when already logged in.
     """
     user = get_current_user(request, db)
     if user is not None:
         return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
-    err = request.query_params.get("error")
+
+    qp_error = request.query_params.get("error")
+    ctx_base = {"user": None, "invite_code": None, "show_register_form": False}
+    if qp_error:
+        return templates.TemplateResponse(
+            request,
+            "register.html",
+            {**ctx_base, "error": qp_error},
+        )
+
+    raw_code = (code or "").strip()
+    if not raw_code:
+        return templates.TemplateResponse(
+            request,
+            "register.html",
+            {
+                **ctx_base,
+                "error": "Registration is by invitation only. Use the link from your invitation.",
+            },
+        )
+
+    invitation = db.scalars(
+        select(Invitation).where(
+            Invitation.code == raw_code,
+            Invitation.used_by.is_(None),
+        ),
+    ).first()
+    if invitation is None:
+        return templates.TemplateResponse(
+            request,
+            "register.html",
+            {
+                **ctx_base,
+                "error": "This invitation link is invalid or has already been used.",
+            },
+        )
+
     return templates.TemplateResponse(
         request,
         "register.html",
-        {"error": err, "user": None},
+        {
+            "user": None,
+            "error": None,
+            "show_register_form": True,
+            "invite_code": raw_code,
+        },
     )
 
 
@@ -261,59 +321,61 @@ async def register_post(
     request: Request,
     username: Annotated[str, Form()],
     password: Annotated[str, Form()],
+    invite_code: Annotated[str | None, Form()] = None,
     db: Session = Depends(get_db),
 ):
     """Create a new user account and establish a session.
 
-    Parameters
-    ----------
-    request : Request
-        Used to render ``register.html`` again when validation fails.
-    username : str
-        Desired login name.
-    password : str
-        Desired plaintext password (hashed before storage).
-    db : Session
-        Database session provided by dependency injection.
-
-    Returns
-    -------
-    RedirectResponse
-        Redirects to ``/welcome`` on success.
-    TemplateResponse
-        Re-renders ``register.html`` with an error when the name is taken
-        or input is invalid. Database ``IntegrityError`` (duplicate
-        username) is caught and mapped to this response.
+    Requires a valid, unused invitation matched by ``invite_code``.
     """
-    name = username.strip()
-    if not name or not password:
-        auth_log.warning("Registration rejected empty username or password")
+
+    def _invite_error_response(msg: str, *, status_cd: int) -> Response:
         return templates.TemplateResponse(
             request,
             "register.html",
             {
-                "error": "Username and password are required.",
+                "error": msg,
                 "user": None,
+                "show_register_form": False,
+                "invite_code": None,
             },
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status_cd,
+        )
+
+    name = username.strip()
+    code_value = (invite_code or "").strip()
+    if not name or not password:
+        auth_log.warning("Registration rejected empty username or password")
+        return _invite_error_response("Username and password are required.", status_cd=status.HTTP_400_BAD_REQUEST)
+
+    invitation = db.scalars(
+        select(Invitation).where(
+            Invitation.code == code_value,
+            Invitation.used_by.is_(None),
+        ),
+    ).first()
+    if invitation is None:
+        auth_log.warning("Registration rejected invalid or spent invite code")
+        return _invite_error_response(
+            "This invitation is invalid or has already been used.",
+            status_cd=status.HTTP_409_CONFLICT,
         )
 
     user = User(username=name, password_hash=hash_password(password))
     db.add(user)
     try:
-        db.commit()
+        db.flush()
     except IntegrityError:
         db.rollback()
         auth_log.warning("Registration failed duplicate username=%s", name)
-        return templates.TemplateResponse(
-            request,
-            "register.html",
-            {
-                "error": "That username is already taken.",
-                "user": None,
-            },
-            status_code=status.HTTP_409_CONFLICT,
+        return _invite_error_response(
+            "That username is already taken.",
+            status_cd=status.HTTP_409_CONFLICT,
         )
+
+    invitation.used_by = user.id
+    invitation.used_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    db.commit()
 
     db.refresh(user)
     auth_log.info("User registered username=%s user_id=%s", name, user.id)
@@ -427,7 +489,7 @@ async def welcome_post(
         raw_topics = form.getlist("topic")
         topic_indices = _parse_topic_indices(
             [str(v) for v in raw_topics],
-            n_topics=len(STARTER_DATA),
+            n_topics=starter_catalog_topic_count(db),
         )
         if not topic_indices:
             return templates.TemplateResponse(
@@ -474,7 +536,7 @@ async def seed_topics_post(
     raw_topics = form.getlist("topic")
     topic_indices = _parse_topic_indices(
         [str(v) for v in raw_topics],
-        n_topics=len(STARTER_DATA),
+        n_topics=starter_catalog_topic_count(db),
     )
     starter_ctx = {"user": user, "starter_topics": starter_topics_for_user(db, user.id)}
 

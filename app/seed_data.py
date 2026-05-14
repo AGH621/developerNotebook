@@ -7,7 +7,9 @@ The .docx file must be present on the deployment host (bundled in the Docker ima
 The parsing runs once when the module is first imported, then the result is cached in memory for the process lifetime -- so it's not re-parsed per user, just re-read from the in-memory list.
 This will work fine as long as the Developer_Commands.docx is included in the Docker image (via COPY in the Dockerfile). But it's a runtime dependency on a binary file, which is a bit fragile. The alternative the FIXME hints at -- pre-parsing the data into a static Python dict -- would be more robust for deployment. That said, this is a design tradeoff, not a bug.
 
-Starter notebook data loaded from the Word cheatsheet.
+Starter notebook data loaded from the Word cheatsheet. Used at startup to
+populate the global ``StarterTopic`` catalog when empty; user notebooks are
+then filled from that database catalog (see ``app.services.seed``).
 """
 
 from __future__ import annotations
@@ -47,26 +49,3 @@ try:
     STARTER_DATA: list[dict] = parse_developer_commands_docx()
 except (FileNotFoundError, PackageNotFoundError):
     STARTER_DATA = _FALLBACK_STARTER_DATA
-
-
-def starter_topics_meta() -> list[dict[str, int | str]]:
-    """Metadata for each starter topic (for onboarding UI).
-
-    Rows are ordered alphabetically by topic name (Unicode case-fold). Each
-    ``index`` is still the topic's position in :data:`STARTER_DATA` for form
-    submissions.
-    """
-    result: list[dict[str, int | str]] = []
-    for i, topic in enumerate(STARTER_DATA):
-        sections = topic["sections"]
-        n_entries = sum(len(s["entries"]) for s in sections)
-        result.append(
-            {
-                "index": i,
-                "name": str(topic["name"]),
-                "n_sections": len(sections),
-                "n_entries": n_entries,
-            },
-        )
-    result.sort(key=lambda m: str(m["name"]).casefold())
-    return result

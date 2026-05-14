@@ -1,0 +1,26 @@
+<tr id="admin-invite-{{ inv.id }}" class="admin-invite-row">
+  <td>
+    <span class="admin-code-snippet" title="{{ inv.code }}">
+      {% if inv.code|length > 14 %}{{ inv.code[:14] }}…{% else %}{{ inv.code }}{% endif %}
+    </span>
+  </td>
+  <td class="admin-invite-url"><code>{{ request.base_url }}register?code={{ inv.code|urlencode }}</code></td>
+  <td>{{ inv.creator.username }}</td>
+  <td>
+    {% if inv.used_by %}
+    <span class="admin-badge admin-badge--ok">Used{% if inv.redeemed_by_user %} · {{ inv.redeemed_by_user.username }}{% endif %}</span>
+    {% else %}
+    <span class="admin-badge admin-badge--pending">Unused</span>
+    {% endif %}
+  </td>
+  <td>
+    {% if not inv.used_by %}
+    <form method="post" action="/admin/invites/{{ inv.id }}/revoke" class="admin-inline-form"
+          onsubmit="return confirm('Revoke this unused invitation?');">
+      <button type="submit" class="admin-btn admin-btn--secondary">Revoke</button>
+    </form>
+    {% else %}
+    <span class="admin-muted">—</span>
+    {% endif %}
+  </td>
+</tr>

@@ -1,0 +1,40 @@
+<section class="admin-starter-section" id="admin-starter-section-{{ section.id }}">
+  <header class="admin-starter-section__head">
+    <form class="admin-starter-section__form" hx-put="/admin/starter/sections/{{ section.id }}">
+      <label class="admin-field">
+        <span>Section heading</span>
+        <input type="text" name="name" value="{{ section.name or '' }}" maxlength="256" autocomplete="off" placeholder="Blank (unnamed section)">
+      </label>
+      <label class="admin-field">
+        <span>Notes</span>
+        <textarea name="notes" rows="2" maxlength="8000" placeholder="Optional callout">{{ section.notes or '' }}</textarea>
+      </label>
+      <div class="admin-starter-section__toolbar">
+        <button type="submit" class="admin-btn admin-btn--secondary admin-btn--small">Save section</button>
+        <button type="button" class="admin-btn admin-btn--danger admin-btn--small"
+          hx-delete="/admin/starter/sections/{{ section.id }}"
+          hx-confirm="Remove this starter section and all its commands?">
+          Delete section
+        </button>
+      </div>
+    </form>
+  </header>
+
+  <div class="admin-entry-list">
+    {% for entry in section.entries %}
+    {% include "admin/partials/starter_entry_edit.html" %}
+    {% endfor %}
+  </div>
+
+  <form class="admin-add-row admin-add-entry" method="post" action="/admin/starter/sections/{{ section.id }}/entries" hx-post="/admin/starter/sections/{{ section.id }}/entries">
+    <label class="admin-field admin-field--tight">
+      <span class="sr-only">Description</span>
+      <input type="text" name="description" placeholder="New description" maxlength="4000" autocomplete="off" class="admin-text-input admin-text-input--grow">
+    </label>
+    <label class="admin-field admin-field--tight">
+      <span class="sr-only">Command</span>
+      <input type="text" name="command" placeholder="command …" maxlength="8000" autocomplete="off" class="admin-text-input admin-text-input--grow">
+    </label>
+    <button type="submit" class="admin-btn admin-btn--primary admin-btn--small">Add command</button>
+  </form>
+</section>

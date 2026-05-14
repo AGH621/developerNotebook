@@ -9,11 +9,14 @@ from sqlalchemy.pool import StaticPool
 from starlette.testclient import TestClient
 
 import app.models  # noqa: F401 — register ORM models on Base.metadata
-from app.database import Base, get_db
+from app.auth import hash_password
+from app.database import Base, apply_sqlite_user_column_migrations, get_db
 from app.main import create_app
+from app.models import Invitation, User
 
 TEST_USERNAME = "testuser"
 TEST_PASSWORD = "test-pass-please-123"
+TEST_INVITE_CODE = "pytest-invite-token"
 
 
 @pytest.fixture
@@ -25,6 +28,7 @@ def test_db() -> Session:
         poolclass=StaticPool,
     )
     Base.metadata.create_all(bind=engine)
+    apply_sqlite_user_column_migrations(engine)
     factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     db = factory()
     try:
@@ -50,11 +54,31 @@ def client(test_db: Session):
 
 
 @pytest.fixture
-def authenticated_client(client: TestClient):
+def register_invite(test_db: Session) -> str:
+    """Unused invitation row usable for POST ``/register`` in tests."""
+    inviter = User(
+        username="_pytest_inviter",
+        password_hash=hash_password("_unused_inviter_pw_"),
+        is_admin=True,
+        is_suspended=False,
+    )
+    test_db.add(inviter)
+    test_db.flush()
+    test_db.add(Invitation(code=TEST_INVITE_CODE, created_by=inviter.id))
+    test_db.commit()
+    return TEST_INVITE_CODE
+
+
+@pytest.fixture
+def authenticated_client(client: TestClient, register_invite: str):
     """Client with session cookie after registering a dedicated test user."""
     r = client.post(
         "/register",
-        data={"username": TEST_USERNAME, "password": TEST_PASSWORD},
+        data={
+            "username": TEST_USERNAME,
+            "password": TEST_PASSWORD,
+            "invite_code": register_invite,
+        },
     )
     assert r.status_code == 303
     assert r.headers.get("location") == "/welcome"
@@ -63,7 +87,21 @@ def authenticated_client(client: TestClient):
 
 
 @pytest.fixture
-def seeded_client(authenticated_client: TestClient, test_db: Session):
+def starter_catalog(test_db: Session) -> None:
+    """Ensure ``StarterTopic`` / ``StarterSection`` / ``StarterEntry`` rows exist (from bundled data)."""
+    from app.bootstrap import seed_starter_catalog_if_empty
+    from app.seed_data import STARTER_DATA
+
+    seed_starter_catalog_if_empty(test_db, STARTER_DATA)
+    test_db.commit()
+
+
+@pytest.fixture
+def seeded_client(
+    authenticated_client: TestClient,
+    test_db: Session,
+    starter_catalog: None,
+):
     """Authenticated client whose user has starter notebook data."""
     from sqlalchemy import select
 
