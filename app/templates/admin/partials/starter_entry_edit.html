@@ -1,5 +1,9 @@
 <div class="admin-entry-edit" id="admin-starter-entry-{{ entry.id }}">
-  <form class="admin-entry-edit__grid" hx-put="/admin/starter/entries/{{ entry.id }}" hx-indicator="closest form">
+  <form
+    method="post"
+    action="/admin/starter/entries/{{ entry.id }}/save"
+    class="admin-entry-edit__grid"
+  >
     <label class="admin-field admin-field--tight">
       <span>Description</span>
       <input type="text" name="description" value="{{ entry.description }}" maxlength="4000" autocomplete="off">
@@ -12,9 +16,14 @@
       <button type="submit" class="admin-btn admin-btn--secondary admin-btn--small">Save</button>
     </div>
   </form>
-  <button type="button" class="admin-btn admin-btn--danger admin-btn--small admin-entry-edit__remove"
-    hx-delete="/admin/starter/entries/{{ entry.id }}"
-    hx-confirm="Delete this starter command row?">
-    Remove
-  </button>
+  <form
+    method="post"
+    action="/admin/starter/entries/{{ entry.id }}/delete"
+    class="admin-entry-edit__remove"
+    onsubmit="return confirm('Delete this starter command row?');"
+  >
+    <button type="submit" class="admin-btn admin-btn--danger admin-btn--small admin-entry-edit__remove-btn">
+      Remove
+    </button>
+  </form>
 </div>

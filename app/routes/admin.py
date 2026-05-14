@@ -305,6 +305,7 @@ async def admin_starter_get(
         t.sections.sort(key=lambda s: (s.display_order, s.id))
         for s in t.sections:
             s.entries.sort(key=lambda e: (e.display_order, e.id))
+    topics_with.sort(key=lambda t: (t.name.casefold(), t.id))
     qp_err = request.query_params.get("error")
     qp_ok = request.query_params.get("ok")
     return templates.TemplateResponse(
@@ -332,7 +333,25 @@ async def admin_starter_add_topic(
     topic = StarterTopic(name=label, display_order=slot)
     db.add(topic)
     db.commit()
-    return _htmx_or_redirect(request, "/admin/starter")
+    frag = f"#admin-starter-topic-{topic.id}"
+    return _htmx_or_redirect(request, "/admin/starter" + frag)
+
+
+def _starter_topic_save_response(
+    request: Request,
+    db: Session,
+    topic_id: int,
+    name: str | None,
+) -> Response:
+    topic = db.get(StarterTopic, topic_id)
+    if topic is None:
+        raise HTTPException(status_code=404, detail="Starter topic not found")
+    lab = (name or "").strip()
+    if lab:
+        topic.name = lab
+    db.commit()
+    frag = f"#admin-starter-topic-{topic_id}"
+    return _htmx_or_redirect(request, "/admin/starter" + frag)
 
 
 @router.put("/starter/topics/{topic_id}", include_in_schema=False)
@@ -343,14 +362,27 @@ async def admin_starter_rename_topic(
     _: User = Depends(require_admin),
     name: Annotated[str | None, Form()] = None,
 ):
+    return _starter_topic_save_response(request, db, topic_id, name)
+
+
+@router.post("/starter/topics/{topic_id}/save", include_in_schema=False)
+async def admin_starter_save_topic_form(
+    request: Request,
+    topic_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+    name: Annotated[str | None, Form()] = None,
+):
+    return _starter_topic_save_response(request, db, topic_id, name)
+
+
+def _starter_topic_delete_response(request: Request, db: Session, topic_id: int) -> Response:
     topic = db.get(StarterTopic, topic_id)
     if topic is None:
         raise HTTPException(status_code=404, detail="Starter topic not found")
-    lab = (name or "").strip()
-    if lab:
-        topic.name = lab
+    db.delete(topic)
     db.commit()
-    return _htmx_or_redirect(request, "/admin/starter")
+    return _htmx_or_redirect(request, "/admin/starter#admin-starter-catalog")
 
 
 @router.delete("/starter/topics/{topic_id}", include_in_schema=False)
@@ -360,12 +392,17 @@ async def admin_starter_delete_topic(
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
 ):
-    topic = db.get(StarterTopic, topic_id)
-    if topic is None:
-        raise HTTPException(status_code=404, detail="Starter topic not found")
-    db.delete(topic)
-    db.commit()
-    return _htmx_or_redirect(request, "/admin/starter")
+    return _starter_topic_delete_response(request, db, topic_id)
+
+
+@router.post("/starter/topics/{topic_id}/delete", include_in_schema=False)
+async def admin_starter_delete_topic_submit(
+    request: Request,
+    topic_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    return _starter_topic_delete_response(request, db, topic_id)
 
 
 @router.post("/starter/topics/{topic_id}/sections", include_in_schema=False)
@@ -391,7 +428,28 @@ async def admin_starter_add_section(
     sec = StarterSection(topic_id=topic_id, name=section_name, display_order=slot, notes=None)
     db.add(sec)
     db.commit()
-    return _htmx_or_redirect(request, "/admin/starter")
+    frag = f"#admin-starter-section-{sec.id}"
+    return _htmx_or_redirect(request, "/admin/starter" + frag)
+
+
+def _starter_section_save_response(
+    request: Request,
+    db: Session,
+    section_id: int,
+    name: str | None,
+    notes: str | None,
+) -> Response:
+    sec = db.get(StarterSection, section_id)
+    if sec is None:
+        raise HTTPException(status_code=404, detail="Starter section not found")
+
+    lbl = (name or "").strip()
+    sec.name = lbl or None
+    ntxt = (notes or "").strip()
+    sec.notes = ntxt or None
+    db.commit()
+    frag = f"#admin-starter-section-{section_id}"
+    return _htmx_or_redirect(request, "/admin/starter" + frag)
 
 
 @router.put("/starter/sections/{section_id}", include_in_schema=False)
@@ -403,16 +461,30 @@ async def admin_starter_edit_section(
     name: Annotated[str | None, Form()] = None,
     notes: Annotated[str | None, Form()] = None,
 ):
+    return _starter_section_save_response(request, db, section_id, name, notes)
+
+
+@router.post("/starter/sections/{section_id}/save", include_in_schema=False)
+async def admin_starter_save_section_form(
+    request: Request,
+    section_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+    name: Annotated[str | None, Form()] = None,
+    notes: Annotated[str | None, Form()] = None,
+):
+    return _starter_section_save_response(request, db, section_id, name, notes)
+
+
+def _starter_section_delete_response(request: Request, db: Session, section_id: int) -> Response:
     sec = db.get(StarterSection, section_id)
     if sec is None:
         raise HTTPException(status_code=404, detail="Starter section not found")
-
-    lbl = (name or "").strip()
-    sec.name = lbl or None
-    ntxt = (notes or "").strip()
-    sec.notes = ntxt or None
+    topic_anchor = sec.topic_id
+    db.delete(sec)
     db.commit()
-    return _htmx_or_redirect(request, "/admin/starter")
+    frag = f"#admin-starter-topic-{topic_anchor}"
+    return _htmx_or_redirect(request, "/admin/starter" + frag)
 
 
 @router.delete("/starter/sections/{section_id}", include_in_schema=False)
@@ -422,12 +494,17 @@ async def admin_starter_delete_section(
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
 ):
-    sec = db.get(StarterSection, section_id)
-    if sec is None:
-        raise HTTPException(status_code=404, detail="Starter section not found")
-    db.delete(sec)
-    db.commit()
-    return _htmx_or_redirect(request, "/admin/starter")
+    return _starter_section_delete_response(request, db, section_id)
+
+
+@router.post("/starter/sections/{section_id}/delete", include_in_schema=False)
+async def admin_starter_delete_section_submit(
+    request: Request,
+    section_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    return _starter_section_delete_response(request, db, section_id)
 
 
 @router.post("/starter/sections/{section_id}/entries", include_in_schema=False)
@@ -454,7 +531,26 @@ async def admin_starter_add_entry(
     ent = StarterEntry(section_id=section_id, description=desc, command=cmd, display_order=slot)
     db.add(ent)
     db.commit()
-    return _htmx_or_redirect(request, "/admin/starter")
+    frag = f"#admin-starter-entry-{ent.id}"
+    return _htmx_or_redirect(request, "/admin/starter" + frag)
+
+
+def _starter_entry_save_response(
+    request: Request,
+    db: Session,
+    entry_id: int,
+    description: str | None,
+    command: str | None,
+) -> Response:
+    ent = db.get(StarterEntry, entry_id)
+    if ent is None:
+        raise HTTPException(status_code=404, detail="Starter entry not found")
+
+    ent.description = (description or "").strip() or ent.description
+    ent.command = (command or "").strip() or ent.command
+    db.commit()
+    frag = f"#admin-starter-entry-{entry_id}"
+    return _htmx_or_redirect(request, "/admin/starter" + frag)
 
 
 @router.put("/starter/entries/{entry_id}", include_in_schema=False)
@@ -466,14 +562,31 @@ async def admin_starter_edit_entry(
     description: Annotated[str | None, Form()] = None,
     command: Annotated[str | None, Form()] = None,
 ):
+    return _starter_entry_save_response(request, db, entry_id, description, command)
+
+
+@router.post("/starter/entries/{entry_id}/save", include_in_schema=False)
+async def admin_starter_save_entry_form(
+    request: Request,
+    entry_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+    description: Annotated[str | None, Form()] = None,
+    command: Annotated[str | None, Form()] = None,
+):
+    """POST variant for Save (classic form + 303 + anchor); same logic as PUT."""
+    return _starter_entry_save_response(request, db, entry_id, description, command)
+
+
+def _starter_entry_delete_response(request: Request, db: Session, entry_id: int) -> Response:
     ent = db.get(StarterEntry, entry_id)
     if ent is None:
         raise HTTPException(status_code=404, detail="Starter entry not found")
-
-    ent.description = (description or "").strip() or ent.description
-    ent.command = (command or "").strip() or ent.command
+    section_anchor = ent.section_id
+    db.delete(ent)
     db.commit()
-    return _htmx_or_redirect(request, "/admin/starter")
+    frag = f"#admin-starter-section-{section_anchor}"
+    return _htmx_or_redirect(request, "/admin/starter" + frag)
 
 
 @router.delete("/starter/entries/{entry_id}", include_in_schema=False)
@@ -483,9 +596,15 @@ async def admin_starter_delete_entry(
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
 ):
-    ent = db.get(StarterEntry, entry_id)
-    if ent is None:
-        raise HTTPException(status_code=404, detail="Starter entry not found")
-    db.delete(ent)
-    db.commit()
-    return _htmx_or_redirect(request, "/admin/starter")
+    return _starter_entry_delete_response(request, db, entry_id)
+
+
+@router.post("/starter/entries/{entry_id}/delete", include_in_schema=False)
+async def admin_starter_delete_entry_submit(
+    request: Request,
+    entry_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """POST variant so Remove can use a normal form (303 redirect, no HTMX)."""
+    return _starter_entry_delete_response(request, db, entry_id)
