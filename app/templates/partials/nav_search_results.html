@@ -1,0 +1,25 @@
+<div class="nav-search-results">
+  {% if results %}
+    <ul class="nav-search-results__list">
+      {% for row in results %}
+        <li class="nav-search-results__item">
+          <a
+            class="nav-search-results__link"
+            href="/topic/{{ row.topic_slug }}#entry-row-{{ row.entry_id }}"
+            aria-label="Open topic {{ row.topic_name }}: {{ row.command }}"
+          >
+            <code class="nav-search-results__cmd">{{ row.command }}</code>
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="nav-search-results__empty">
+      {% if query %}
+        No matching notebook entries.
+      {% else %}
+        Type a search phrase to filter commands across your notebook.
+      {% endif %}
+    </p>
+  {% endif %}
+</div>

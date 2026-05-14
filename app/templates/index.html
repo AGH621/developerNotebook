@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}Index — Developer Notebook{% endblock %}
+{% block main_extra_class %} site-main--home{% endblock %}
+{% block content %}
+<div class="index-shell" data-index-root>
+  <header class="index-header" id="index-top">
+    <h1>Index</h1>
+    <p class="index-header__hint">One table per letter; rows sorted by the first word of the description. Use the filter to narrow rows.</p>
+  </header>
+
+  <div class="index-filter-wrap">
+    <label class="visually-hidden" for="index-filter">Filter index</label>
+    <input
+      id="index-filter"
+      class="index-filter"
+      type="search"
+      name="filter"
+      placeholder="Filter by description, command, or topic…"
+      autocomplete="off"
+      data-index-filter
+    >
+  </div>
+
+  {% if letter_sections %}
+    <nav class="index-jump-nav" aria-label="Jump to letter" data-index-jump>
+      {% for section in letter_sections %}
+        <a class="index-jump-nav__link" href="#index-letter-{{ section.anchor }}">{{ section.letter }}</a>
+      {% endfor %}
+    </nav>
+    <a class="index-back-top" href="#index-top">Back to top</a>
+  {% endif %}
+
+  {% for section in letter_sections %}
+    <section
+      class="index-letter-block"
+      id="index-letter-{{ section.anchor }}"
+      aria-labelledby="index-letter-heading-{{ section.anchor }}"
+    >
+      <h2 class="index-letter" id="index-letter-heading-{{ section.anchor }}">{{ section.letter }}</h2>
+      <div class="entry-table-wrap index-table-wrap">
+        <table class="entry-table index-table">
+          <thead>
+            <tr>
+              <th scope="col" class="entry-table__col-desc">Description</th>
+              <th scope="col" class="entry-table__col-cmd">Command</th>
+              <th scope="col" class="entry-table__col-actions"></th>
+              <th scope="col" class="index-table__topic">Topic</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in section.entries %}
+              <tr
+                class="entry-row index-entry"
+                id="index-entry-{{ row.entry_id }}"
+                data-index-search="{{ (row.description ~ ' ' ~ row.command ~ ' ' ~ row.topic_name ~ ' ' ~ row.section_name)|lower }}"
+              >
+                <td class="entry-row__description">
+                  <span class="entry-row__description-text">{{ row.description }}</span>
+                </td>
+                <td class="entry-row__command">
+                  <code class="entry-row__code"><span class="entry-row__code-text">{{ row.command }}</span></code>
+                </td>
+                <td class="entry-row__actions">
+                  <button
+                    type="button"
+                    class="entry-copy entry-row__btn icon-label-btn"
+                    data-command="{{ row.command|e }}"
+                    title="Copy"
+                    aria-label="Copy command to clipboard"
+                  >
+                    <span class="icon-label-btn__icon" aria-hidden="true">
+                      <svg><use href="#sprite-icon-copy"/></svg>
+                    </span>
+                  </button>
+                </td>
+                <td class="index-entry__topic-cell">
+                  <a class="index-entry__topic" href="/topic/{{ row.topic_slug }}">{{ row.topic_name }}</a>
+                  {% if row.section_name %}
+                    <span class="index-entry__section">{{ row.section_name }}</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% endfor %}
+
+  {% if not letter_sections %}
+    <p class="index-empty">No entries yet.</p>
+  {% endif %}
+</div>
+
+<script>
+(function () {
+  var root = document.querySelector("[data-index-root]");
+  if (!root) return;
+  var input = root.querySelector("[data-index-filter]");
+  if (!input) return;
+
+  var jumpNav = root.querySelector("[data-index-jump]");
+  if (jumpNav) {
+    jumpNav.addEventListener(
+      "click",
+      function (e) {
+        var a = e.target.closest("a.index-jump-nav__link");
+        if (!a || !jumpNav.contains(a)) return;
+        if (a.classList.contains("index-jump-nav__link--inactive")) {
+          e.preventDefault();
+        }
+      },
+      true,
+    );
+  }
+
+  function norm(text) {
+    return (text || "").toLowerCase();
+  }
+
+  function apply(filterText) {
+    var q = norm(filterText).trim();
+    var sections = root.querySelectorAll(".index-letter-block");
+
+    sections.forEach(function (sectionBlock) {
+      var rows = sectionBlock.querySelectorAll("[data-index-search]");
+      var visibleSectionCount = 0;
+
+      rows.forEach(function (row) {
+        var hay = norm(row.getAttribute("data-index-search"));
+        var show = q === "" || hay.indexOf(q) !== -1;
+        row.style.display = show ? "" : "none";
+        if (show) visibleSectionCount += 1;
+      });
+
+      sectionBlock.style.display = visibleSectionCount > 0 ? "" : "none";
+
+      var bid = sectionBlock.id;
+      if (jumpNav && bid) {
+        var link = jumpNav.querySelector('a[href="#' + bid + '"]');
+        if (link) {
+          var showLink = visibleSectionCount > 0;
+          link.classList.toggle("index-jump-nav__link--inactive", !showLink);
+          link.tabIndex = showLink ? 0 : -1;
+          link.setAttribute("aria-disabled", showLink ? "false" : "true");
+        }
+      }
+    });
+  }
+
+  input.addEventListener("input", function () {
+    apply(input.value);
+  });
+
+  apply(input.value || "");
+})();
+</script>
+{% endblock %}

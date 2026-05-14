@@ -1,0 +1,55 @@
+<div class="search-results">
+  {% if results %}
+    <div class="search-results-wrap entry-table-wrap">
+      <table class="entry-table search-results__table">
+        <thead>
+          <tr>
+            <th scope="col" class="entry-table__col-desc">Description</th>
+            <th scope="col" class="entry-table__col-cmd">Command</th>
+            <th scope="col" class="entry-table__col-actions"></th>
+            <th scope="col" class="search-results__col-topic">Topic</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in results %}
+            <tr class="entry-row search-results__row" id="search-result-{{ row.entry_id }}">
+              <td class="entry-row__description">
+                {% if row.section_name %}
+                  <span class="search-results__section">{{ row.section_name }}</span>
+                {% endif %}
+                <span class="entry-row__description-text">{{ row.description }}</span>
+              </td>
+              <td class="entry-row__command">
+                <code class="entry-row__code"><span class="entry-row__code-text">{{ row.command }}</span></code>
+              </td>
+              <td class="entry-row__actions search-results__actions">
+                <button
+                  type="button"
+                  class="entry-copy entry-row__btn icon-label-btn"
+                  data-command="{{ row.command|e }}"
+                  title="Copy"
+                  aria-label="Copy command to clipboard"
+                >
+                  <span class="icon-label-btn__icon" aria-hidden="true">
+                    <svg><use href="#sprite-icon-copy"/></svg>
+                  </span>
+                </button>
+              </td>
+              <td class="search-results__topic">
+                <a class="index-entry__topic" href="/topic/{{ row.topic_slug }}">{{ row.topic_name }}</a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="search-results__empty">
+      {% if query %}
+        No matching notebook entries.
+      {% else %}
+        Type a search phrase to filter commands across your notebook.
+      {% endif %}
+    </p>
+  {% endif %}
+</div>

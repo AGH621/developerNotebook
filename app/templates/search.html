@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Search — Developer Notebook{% endblock %}
+{% block main_extra_class %} site-main--home{% endblock %}
+{% block content %}
+<div class="page-search-shell">
+  <header class="page-search-header">
+    <h1>Search</h1>
+  </header>
+
+  <form class="page-search-bar" action="/search" method="get">
+    <label class="visually-hidden" for="page-search-q">Search commands</label>
+    <input
+      id="page-search-q"
+      type="search"
+      name="q"
+      value="{{ query }}"
+      placeholder="Search commands…"
+      autocomplete="off"
+      hx-get="/search"
+      hx-trigger="keyup changed delay:300ms"
+      hx-target="#page-search-results"
+      hx-push-url="true"
+    >
+    <noscript><button type="submit" class="page-search-submit">Search</button></noscript>
+  </form>
+
+  <div id="page-search-results" class="page-search-results">
+    {% include "partials/search_results.html" %}
+  </div>
+</div>
+{% endblock %}

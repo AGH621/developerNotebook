@@ -29,6 +29,31 @@
 {% include "partials/topic_menu_sprite.html" %}
   <nav class="site-nav">
     <a href="/" class="site-nav__brand">Developer Notebook</a>
+    {% if user %}
+    <div class="site-nav__search-slot">
+      <form class="site-nav__search" action="/search" method="get">
+        <label class="visually-hidden" for="site-nav-search-q">Search commands</label>
+        <input
+          id="site-nav-search-q"
+          type="search"
+          name="q"
+          placeholder="Search commands…"
+          autocomplete="off"
+          hx-get="/search?view=nav"
+          hx-trigger="keyup changed delay:300ms"
+          hx-target="#nav-search-live"
+          hx-push-url="false"
+        >
+      </form>
+      <div
+        id="nav-search-live"
+        class="nav-search-live"
+        role="region"
+        aria-label="Live search results"
+        aria-live="polite"
+      ></div>
+    </div>
+    {% endif %}
     <div class="site-nav__theme">
       <button type="button" class="site-nav__theme-toggle" id="theme-toggle" aria-label="Use dark theme" title="Dark mode">
         <svg class="site-nav__theme-icon--moon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -44,6 +69,7 @@
     {% if user.is_admin %}
     <a href="/admin" class="site-nav__admin">Admin</a>
     {% endif %}
+    <a href="/index" class="site-nav__index">Index</a>
     <a href="/seed-topics" class="site-nav__seed">Add cheatsheets</a>
     <span class="site-nav__user">{{ user.username }}</span>
     <form method="post" action="/logout" class="site-nav__logout">
@@ -323,6 +349,43 @@
     );
 
     document.body.addEventListener("htmx:afterSwap", dismissAll);
+  })();
+  </script>
+  <script>
+  (function () {
+    var slot = document.querySelector(".site-nav__search-slot");
+    if (!slot) return;
+    var input = slot.querySelector("input[name='q']");
+    var live = document.getElementById("nav-search-live");
+    if (!input || !live) return;
+
+    function dismiss() {
+      live.innerHTML = "";
+    }
+
+    input.addEventListener("keydown", function (evt) {
+      if (evt.key === "Escape" || evt.key === "Esc") {
+        dismiss();
+        input.blur();
+      }
+    });
+
+    document.addEventListener(
+      "pointerdown",
+      function (evt) {
+        if (!live.innerHTML.trim()) return;
+        if (slot.contains(evt.target)) return;
+        dismiss();
+      },
+      true,
+    );
+
+    slot.addEventListener("focusout", function () {
+      window.setTimeout(function () {
+        if (slot.contains(document.activeElement)) return;
+        dismiss();
+      }, 200);
+    });
   })();
   </script>
 </body>

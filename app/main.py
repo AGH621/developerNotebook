@@ -14,6 +14,7 @@ load_dotenv(_PROJECT_ROOT / ".env")
 
 from app.bootstrap import run_startup_tasks
 from app.database import Base, SessionLocal, apply_sqlite_user_column_migrations, engine
+from app.indexing import ensure_fts_table
 
 logging.basicConfig(
     level=getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), logging.INFO),
@@ -31,6 +32,7 @@ async def lifespan(app: FastAPI):
 
     Base.metadata.create_all(bind=engine)
     apply_sqlite_user_column_migrations(engine)
+    ensure_fts_table(engine)
     logger.info("Database tables ensured (create_all).")
     db = SessionLocal()
     try:
@@ -70,13 +72,14 @@ def create_app(*, enable_lifespan: bool = True) -> FastAPI:
 
     application.mount("/static", StaticFiles(directory=str(_APP_DIR / "static")), name="static")
 
-    from app.routes import admin, entries, pages, sections, topics
+    from app.routes import admin, entries, pages, search, sections, topics
 
     application.include_router(pages.router)
     application.include_router(admin.router)
     application.include_router(topics.router)
     application.include_router(sections.router)
     application.include_router(entries.router)
+    application.include_router(search.router)
     return application
 
 

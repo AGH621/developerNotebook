@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.auth import require_auth
 from app.database import get_db
+from app.indexing import fts_delete, fts_insert, fts_update
 from app.models import Entry, Section, Topic, User
 from app.templating import templates
 
@@ -88,6 +89,8 @@ async def create_entry(
     slot = int(next_ord) + 1 if next_ord is not None else 0
     entry = Entry(section_id=section_id, description=desc, command=cmd, display_order=slot)
     db.add(entry)
+    db.flush()
+    fts_insert(db, entry.id, desc, cmd)
     db.commit()
     db.refresh(entry)
     entries_log.info(
@@ -290,8 +293,13 @@ async def update_entry(
         )
         return Response(status_code=404)
 
-    entry.description = (description or "").strip()
-    entry.command = (command or "").strip()
+    old_desc = entry.description
+    old_cmd = entry.command
+    new_desc = (description or "").strip()
+    new_cmd = (command or "").strip()
+    entry.description = new_desc
+    entry.command = new_cmd
+    fts_update(db, entry.id, old_desc, old_cmd, new_desc, new_cmd)
     db.commit()
     db.refresh(entry)
     entries_log.info("Entry updated id=%s user_id=%s", entry_id, user.id)
@@ -333,6 +341,7 @@ async def delete_entry(
         )
         return Response(status_code=404)
     sid = entry.section_id
+    fts_delete(db, entry.id, entry.description, entry.command)
     db.delete(entry)
     db.commit()
     entries_log.info("Entry deleted id=%s section_id=%s user_id=%s", entry_id, sid, user.id)

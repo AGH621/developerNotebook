@@ -11,6 +11,7 @@ from starlette.testclient import TestClient
 import app.models  # noqa: F401 — register ORM models on Base.metadata
 from app.auth import hash_password
 from app.database import Base, apply_sqlite_user_column_migrations, get_db
+from app.indexing import ensure_fts_table
 from app.main import create_app
 from app.models import Invitation, User
 
@@ -29,6 +30,7 @@ def test_db() -> Session:
     )
     Base.metadata.create_all(bind=engine)
     apply_sqlite_user_column_migrations(engine)
+    ensure_fts_table(engine)
     factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     db = factory()
     try:

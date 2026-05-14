@@ -7,6 +7,7 @@ import logging
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.indexing import fts_rebuild
 from app.models import Entry, Section, StarterEntry, StarterSection, StarterTopic, Topic
 from app.slug import allocate_topic_slug as _allocate_slug_for_user
 
@@ -178,4 +179,9 @@ def populate_starter_data(
         n_sections,
         n_entries,
     )
+
+    db.flush()
+    if n_entries:
+        fts_rebuild(db)
+
     return {"topics": n_topics, "sections": n_sections, "entries": n_entries}
