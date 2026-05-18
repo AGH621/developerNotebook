@@ -35,6 +35,9 @@ def test_apply_sqlite_user_column_migrations_adds_missing_columns():
     cols = {c["name"] for c in inspector.get_columns("users")}
     assert "is_admin" in cols
     assert "is_suspended" in cols
+    assert "session_version" in cols
+    assert "failed_login_count" in cols
+    assert "locked_until" in cols
 
     factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     db = factory()
@@ -46,6 +49,8 @@ def test_apply_sqlite_user_column_migrations_adds_missing_columns():
         assert merged is not None
         assert merged.is_admin is False
         assert merged.is_suspended is False
+        assert merged.failed_login_count == 0
+        assert merged.locked_until is None
     finally:
         db.close()
 

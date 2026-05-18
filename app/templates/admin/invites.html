@@ -17,6 +17,7 @@
 {% endif %}
 
 <form method="post" action="/admin/invites" class="admin-toolbar">
+  {% include "partials/csrf_field.html" %}
   <button type="submit" class="admin-btn admin-btn--primary">Generate invitation</button>
 </form>
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, status
@@ -19,9 +19,12 @@ from app.auth import (
     get_current_user,
     hash_password,
     require_auth,
+    session_cookie_secure,
+    validate_password,
     verify_password,
 )
 from app.database import get_db
+from app.rate_limit import limiter
 from app.models import Invitation, Section, Topic, User
 from app.routes.sections import _topic_context_flags
 from app.services.seed import (
@@ -125,7 +128,11 @@ async def topic_detail(
 
 
 def _clear_session_cookie(response: Response) -> None:
-    response.delete_cookie(SESSION_COOKIE_NAME, path="/")
+    response.delete_cookie(
+        SESSION_COOKIE_NAME,
+        path="/",
+        secure=session_cookie_secure(),
+    )
 
 
 @router.get("/login")
@@ -158,6 +165,7 @@ async def login_get(request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("/login")
+@limiter.limit("5/minute")
 async def login_post(
     request: Request,
     username: Annotated[str, Form()],
@@ -210,8 +218,34 @@ async def login_post(
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
 
+    _LOCKOUT_THRESHOLD = 11
+    _LOCKOUT_DURATION = timedelta(minutes=30)
+
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    if row.locked_until and row.locked_until > now_utc:
+        auth_log.warning("Login blocked locked account username=%s user_id=%s", name, row.id)
+        return templates.TemplateResponse(
+            request,
+            "login.html",
+            {
+                "error": "Account temporarily locked due to too many failed attempts. Try again later.",
+                "user": None,
+            },
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
     if not verify_password(password, row.password_hash):
-        auth_log.warning("Login failed bad password username=%s", name)
+        row.failed_login_count += 1
+        if row.failed_login_count >= _LOCKOUT_THRESHOLD:
+            row.locked_until = now_utc + _LOCKOUT_DURATION
+            auth_log.warning(
+                "Account locked username=%s user_id=%s after %d failures",
+                name, row.id, row.failed_login_count,
+            )
+        else:
+            auth_log.warning("Login failed bad password username=%s", name)
+        db.commit()
         return templates.TemplateResponse(
             request,
             "login.html",
@@ -234,9 +268,12 @@ async def login_post(
             status_code=status.HTTP_403_FORBIDDEN,
         )
 
+    row.failed_login_count = 0
+    row.locked_until = None
+    db.commit()
     auth_log.info("Login succeeded username=%s user_id=%s", name, row.id)
     response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
-    create_session(response, row.id)
+    create_session(response, row)
     return response
 
 
@@ -317,6 +354,7 @@ async def register_get(
 
 
 @router.post("/register")
+@limiter.limit("5/minute")
 async def register_post(
     request: Request,
     username: Annotated[str, Form()],
@@ -361,6 +399,11 @@ async def register_post(
             status_cd=status.HTTP_409_CONFLICT,
         )
 
+    pw_err = validate_password(password)
+    if pw_err:
+        auth_log.warning("Registration rejected weak password username=%s", name)
+        return _invite_error_response(pw_err, status_cd=status.HTTP_400_BAD_REQUEST)
+
     user = User(username=name, password_hash=hash_password(password))
     db.add(user)
     try:
@@ -380,7 +423,7 @@ async def register_post(
     db.refresh(user)
     auth_log.info("User registered username=%s user_id=%s", name, user.id)
     response = RedirectResponse(url="/welcome", status_code=status.HTTP_303_SEE_OTHER)
-    create_session(response, user.id)
+    create_session(response, user)
     return response
 
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import secrets
+from datetime import datetime, timezone
 from typing import Annotated
 from urllib.parse import quote
 
@@ -12,7 +13,7 @@ from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.auth import hash_password, require_admin
+from app.auth import hash_password, require_admin, validate_password
 from app.database import get_db
 from app.models import (
     Invitation,
@@ -24,6 +25,8 @@ from app.models import (
 )
 from app.templating import templates
 
+# include_in_schema=False hides routes from the OpenAPI document only; every path
+# still enforces auth via require_admin — it is not an access-control mechanism.
 router = APIRouter(prefix="/admin", tags=["admin"])
 admin_log = logging.getLogger("devnotebook.routes.admin")
 
@@ -92,6 +95,7 @@ async def admin_dashboard(
             "user_rows": rows,
             "error": qp_error,
             "ok_message": qp_ok,
+            "now_utc": datetime.now(timezone.utc).replace(tzinfo=None),
         },
     )
 
@@ -123,6 +127,7 @@ async def admin_toggle_suspend(
                 status_code=status.HTTP_303_SEE_OTHER,
             )
         target.is_suspended = True
+        target.session_version += 1
         msg = quote(f"Account {target.username} has been suspended.")
     db.commit()
     admin_log.info(
@@ -132,6 +137,24 @@ async def admin_toggle_suspend(
         target.is_suspended,
     )
     return RedirectResponse(url="/admin?ok=" + msg, status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/users/{user_id}/unlock", include_in_schema=False)
+async def admin_unlock_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(require_admin),
+):
+    target = db.get(User, user_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    target.failed_login_count = 0
+    target.locked_until = None
+    db.commit()
+    admin_log.info("admin=%s unlocked user_id=%s", admin_user.id, target.id)
+    ok = quote(f"Account {target.username} has been unlocked.")
+    return RedirectResponse(url="/admin?ok=" + ok, status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/users/{user_id}/delete", include_in_schema=False)
@@ -202,7 +225,16 @@ async def admin_password_set(
             status_code=status.HTTP_303_SEE_OTHER,
         )
 
+    pw_err = validate_password(pw)
+    if pw_err:
+        err = quote(pw_err)
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/password?error={err}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
     target.password_hash = hash_password(pw)
+    target.session_version += 1
     db.commit()
     admin_log.info("admin=%s reset password user_id=%s", admin_user.id, target.id)
     ok = quote(f"Password updated for {target.username}.")

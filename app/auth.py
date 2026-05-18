@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 import os
+from functools import lru_cache
+from pathlib import Path
 
 import bcrypt
 from fastapi import Depends, HTTPException, Request
@@ -17,13 +19,63 @@ from app.models import User
 
 SESSION_COOKIE_NAME = "session"
 _SESSION_SALT = "devnotebook-session"
+_DEV_FALLBACK_SECRET = "dev-only-insecure-secret-change-me"
+_dev_secret_warning_emitted = False
 
 logger = logging.getLogger("devnotebook.auth")
 
 
+def resolve_session_secret() -> str:
+    """Return ``SECRET_KEY`` for signing; enforce in non-dev environments.
+
+    When ``APP_ENV`` is unset or ``dev``, a weak default is allowed (with one
+    warning). Production-style environments must set ``SECRET_KEY`` explicitly.
+    """
+    global _dev_secret_warning_emitted
+    raw = os.environ.get("SECRET_KEY")
+    if raw:
+        return raw
+    app_env = os.environ.get("APP_ENV", "dev").strip().lower()
+    if app_env not in ("", "dev"):
+        raise RuntimeError(
+            "SECRET_KEY must be set when APP_ENV is not 'dev' (e.g. production deployments).",
+        )
+    if not _dev_secret_warning_emitted:
+        logger.warning(
+            "SECRET_KEY is not set; using an insecure development default. "
+            "Set SECRET_KEY before any shared or production deployment.",
+        )
+        _dev_secret_warning_emitted = True
+    return _DEV_FALLBACK_SECRET
+
+
+def session_cookie_secure() -> bool:
+    """Whether session (and CSRF) cookies should use the ``Secure`` flag."""
+    return os.environ.get("SECURE_COOKIES", "").strip().lower() in ("1", "true", "yes")
+
+
+@lru_cache(maxsize=1)
+def _load_common_passwords() -> frozenset[str]:
+    path = Path(__file__).resolve().parent / "data" / "common_passwords.txt"
+    if not path.exists():
+        logger.warning("Common passwords list not found at %s; breach check disabled.", path)
+        return frozenset()
+    return frozenset(
+        line.strip().lower() for line in path.read_text().splitlines() if line.strip()
+    )
+
+
+def validate_password(password: str) -> str | None:
+    """Return an error message if ``password`` is too weak, else ``None``."""
+    if len(password) < 8:
+        return "Password must be at least 8 characters long."
+    if password.lower() in _load_common_passwords():
+        return "This password is too common. Please choose a different one."
+    return None
+
+
 def _session_serializer() -> URLSafeSerializer:
     """
-    FIXME: Generate proper secret in .env (create .env if needed)
     Serializer for session cookie payloads.
 
     Returns
@@ -31,11 +83,7 @@ def _session_serializer() -> URLSafeSerializer:
     URLSafeSerializer
         Configured with ``SECRET_KEY`` (or a dev fallback) and a fixed salt.
     """
-    secret = os.environ.get(
-        "SECRET_KEY",
-        "dev-insecure-default-change-before-production",
-    )
-    return URLSafeSerializer(secret, salt=_SESSION_SALT)
+    return URLSafeSerializer(resolve_session_secret(), salt=_SESSION_SALT)
 
 
 def hash_password(password: str) -> str:
@@ -88,22 +136,24 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
-def create_session(response: Response, user_id: int) -> None:
-    """Sign ``user_id`` and set the HTTP-only session cookie on ``response``.
+def create_session(response: Response, user: User) -> None:
+    """Sign ``user`` identity and set the HTTP-only session cookie on ``response``.
 
     Parameters
     ----------
     response : Response
         Outgoing response (e.g. redirect) that will carry ``Set-Cookie``.
-    user_id : int
-        Primary key of the authenticated user.
+    user : User
+        Authenticated user row (``id`` and ``session_version`` are serialized).
 
     Returns
     -------
     None
         Mutates ``response`` in place.
     """
-    token = _session_serializer().dumps({"user_id": user_id})
+    token = _session_serializer().dumps(
+        {"user_id": user.id, "session_version": user.session_version},
+    )
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
         value=token,
@@ -111,6 +161,7 @@ def create_session(response: Response, user_id: int) -> None:
         samesite="lax",
         path="/",
         max_age=60 * 60 * 24 * 14,
+        secure=session_cookie_secure(),
     )
 
 
@@ -128,7 +179,8 @@ def get_current_user(request: Request, db: Session) -> User | None:
     -------
     User or None
         The user when the cookie is present, well-formed, refers to an
-        existing row, and the account is not suspended; otherwise ``None``.
+        existing row, ``session_version`` matches, and the account is not
+        suspended; otherwise ``None``.
     """
     raw = request.cookies.get(SESSION_COOKIE_NAME)
     if not raw:
@@ -138,12 +190,18 @@ def get_current_user(request: Request, db: Session) -> User | None:
     except BadSignature:
         logger.debug("Session cookie signature invalid or tampered")
         return None
-    user_id = payload.get("user_id") if isinstance(payload, dict) else None
-    if not isinstance(user_id, int):
+    if not isinstance(payload, dict):
+        return None
+    user_id = payload.get("user_id")
+    cookie_ver = payload.get("session_version")
+    if not isinstance(user_id, int) or not isinstance(cookie_ver, int):
         return None
     user = db.scalars(select(User).where(User.id == user_id)).first()
     if user is None:
         logger.debug("Session references missing user id=%s", user_id)
+        return None
+    if user.session_version != cookie_ver:
+        logger.info("Session rejected stale session_version user_id=%s", user_id)
         return None
     if user.is_suspended:
         logger.info("Session denied for suspended user id=%s", user_id)

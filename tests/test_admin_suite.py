@@ -22,7 +22,7 @@ def _admin_login(client: TestClient, db: Session) -> None:
 def test_member_blocked_from_admin_home(client: TestClient, test_db: Session, register_invite: str):
     client.post(
         "/register",
-        data={"username": "pleb", "password": "pw", "invite_code": register_invite},
+        data={"username": "pleb", "password": "pw-longer", "invite_code": register_invite},
     )
     assert client.get("/admin").status_code == 403
 
@@ -237,7 +237,7 @@ def test_suspend_other_user_via_admin(client: TestClient, test_db: Session, regi
 
     client.post(
         "/register",
-        data={"username": "vic", "password": "vicpw", "invite_code": "second-inv-for-suspend"},
+        data={"username": "vic", "password": "vicpass-long", "invite_code": "second-inv-for-suspend"},
     )
     # Registration replaced the session cookie; log back in as staff.
     client.post("/login", data={"username": "_staff_adm_", "password": "Staff-Pass-77"})

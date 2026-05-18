@@ -17,6 +17,7 @@
     {% if not inv.used_by %}
     <form method="post" action="/admin/invites/{{ inv.id }}/revoke" class="admin-inline-form"
           onsubmit="return confirm('Revoke this unused invitation?');">
+      {% include "partials/csrf_field.html" %}
       <button type="submit" class="admin-btn admin-btn--secondary">Revoke</button>
     </form>
     {% else %}

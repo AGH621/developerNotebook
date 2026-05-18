@@ -4,7 +4,6 @@
   hx-post="{{ action }}"
   hx-target="{{ target }}"
   hx-swap="{{ swap|default('beforeend') }}"
-  hx-on::after-request="if(event.detail.successful && event.target === this) this.reset()"
 >
   {% if variant == 'entry' %}
   <label class="add-form__label">

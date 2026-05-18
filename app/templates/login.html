@@ -7,6 +7,7 @@
   <p class="auth-panel__error" role="alert">{{ error }}</p>
   {% endif %}
   <form method="post" action="/login" class="auth-form">
+    {% include "partials/csrf_field.html" %}
     <label class="auth-form__field">
       <span>Username</span>
       <input name="username" type="text" required autocomplete="username" maxlength="150">

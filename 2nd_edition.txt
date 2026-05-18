@@ -5,6 +5,9 @@ Second Edition
 
 3. Style refinements
 	k. dark mode
+	l. inoperative dark mode button on login screen --> why?
+	m. need a copy button for invitation links
+	n. clean up command level buttons (make them look like technology level ones)
 
 4. Features
 	j. user reset own password
@@ -16,6 +19,16 @@ Second Edition
 
 5. Security: 
 	a. Application only knows character strings (nothing about commands or executing commands)
-	b. Timeouts
-	c. Retry limits
-	d. ???
+
+6. Guest account:
+	a. read only
+	b. cannot add/delete/edit any data
+	c. can copy commands to clipboard
+	d. has a limited set of seed technologies (which?)
+
+7. Better search [from Cursor chat on 17 May 2026]
+	FTS stands for Full-Text Search. An FTS table is a special virtual table in SQLite (specifically you're using FTS5, the latest version) that builds an inverted index over text content — essentially the same kind of index that powers search engines like Google. It lets you do fast keyword searches across large amounts of text, including things like prefix matching, phrase matching, and ranking by relevance.
+	
+	Your app doesn't actually use it for search right now. Search is done with plain LIKE queries directly against the entries table. The FTS table is being maintained (kept in sync with writes) but not read from — it's there as a future optimization path in case the dataset grows large enough that LIKE queries become slow.
+
+	For a personal developer notebook, LIKE-based search is probably fine for a long time. FTS would start to matter if you had thousands of entries and wanted sub-millisecond search, ranked results, or more advanced query syntax like "python AND regex".

@@ -11,6 +11,7 @@
 
   <div class="welcome-cards">
     <form method="post" action="/welcome" class="welcome-card-form">
+      {% include "partials/csrf_field.html" %}
       <input type="hidden" name="choice" value="blank">
       <button type="submit" class="welcome-card">
         <span class="welcome-card__title">Start with a blank notebook</span>
@@ -18,6 +19,7 @@
       </button>
     </form>
     <form method="post" action="/welcome" class="welcome-card-form seed-topic-form">
+      {% include "partials/csrf_field.html" %}
       <input type="hidden" name="choice" value="template">
       <div class="welcome-seed-panel">
         <h2 class="welcome-card__title welcome-seed-panel__heading">Seed selected topics</h2>

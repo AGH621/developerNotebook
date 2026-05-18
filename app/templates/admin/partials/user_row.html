@@ -11,6 +11,8 @@
   <td>
     {% if u.is_suspended %}
     <span class="admin-badge admin-badge--suspend">Suspended</span>
+    {% elif u.locked_until and u.locked_until > now_utc %}
+    <span class="admin-badge admin-badge--suspend">Locked</span>
     {% else %}
     <span class="admin-badge admin-badge--ok">Active</span>
     {% endif %}
@@ -22,11 +24,19 @@
     <span class="admin-muted" title="You cannot apply these actions to your own signed-in session on this row.">—</span>
     {% else %}
     <form method="post" action="/admin/users/{{ u.id }}/suspend" class="admin-inline-form">
+      {% include "partials/csrf_field.html" %}
       <button type="submit" class="admin-btn admin-btn--secondary admin-btn--small">{{ 'Unsuspend' if u.is_suspended else 'Suspend' }}</button>
     </form>
+    {% if u.locked_until and u.locked_until > now_utc %}
+    <form method="post" action="/admin/users/{{ u.id }}/unlock" class="admin-inline-form">
+      {% include "partials/csrf_field.html" %}
+      <button type="submit" class="admin-btn admin-btn--secondary admin-btn--small">Unlock</button>
+    </form>
+    {% endif %}
     <form method="post" action="/admin/users/{{ u.id }}/delete"
           class="admin-inline-form"
           onsubmit="return confirm('Delete {{ u.username }} and all notebooks?');">
+      {% include "partials/csrf_field.html" %}
       <button type="submit" class="admin-btn admin-btn--danger admin-btn--small">Delete</button>
     </form>
     <a href="/admin/users/{{ u.id }}/password" class="admin-btn-link">Password</a>

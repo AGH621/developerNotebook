@@ -4,6 +4,7 @@
     action="/admin/starter/entries/{{ entry.id }}/save"
     class="admin-entry-edit__grid"
   >
+    {% include "partials/csrf_field.html" %}
     <label class="admin-field admin-field--tight">
       <span>Description</span>
       <input type="text" name="description" value="{{ entry.description }}" maxlength="4000" autocomplete="off">
@@ -22,6 +23,7 @@
     class="admin-entry-edit__remove"
     onsubmit="return confirm('Delete this starter command row?');"
   >
+    {% include "partials/csrf_field.html" %}
     <button type="submit" class="admin-btn admin-btn--danger admin-btn--small admin-entry-edit__remove-btn">
       Remove
     </button>

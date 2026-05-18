@@ -1,0 +1,3 @@
+{% if request.cookies.get('csrftoken') %}
+<input type="hidden" name="csrftoken" value="{{ request.cookies.get('csrftoken') }}">
+{% endif %}

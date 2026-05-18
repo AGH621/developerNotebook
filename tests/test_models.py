@@ -117,12 +117,13 @@ def test_topic_slug_unique_per_user(test_db: Session):
 
 
 def test_user_admin_flags_default_false(test_db: Session):
-    user = User(username="plain", password_hash=hash_password("x"))
+    user = User(username="plain", password_hash=hash_password("longenough"))
     test_db.add(user)
     test_db.commit()
     loaded = test_db.scalars(select(User).where(User.id == user.id)).one()
     assert loaded.is_admin is False
     assert loaded.is_suspended is False
+    assert loaded.session_version == 0
 
 
 def test_invitation_created_and_redeemed_by_users(test_db: Session):

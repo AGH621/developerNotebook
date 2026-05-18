@@ -72,7 +72,6 @@
         hx-post="/sections/{{ section.id }}/entries"
         hx-target="#entries-tbody-{{ section.id }}"
         hx-swap="beforeend"
-        hx-on::after-request="if(event.detail.successful && event.target === this) this.reset()"
       ></form>
       <table
         class="entry-table"

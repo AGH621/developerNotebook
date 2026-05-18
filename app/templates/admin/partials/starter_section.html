@@ -5,6 +5,7 @@
       action="/admin/starter/sections/{{ section.id }}/save"
       class="admin-starter-section__form"
     >
+      {% include "partials/csrf_field.html" %}
       <label class="admin-field">
         <span>Section heading</span>
         <input type="text" name="name" value="{{ section.name or '' }}" maxlength="256" autocomplete="off" placeholder="Blank (unnamed section)">
@@ -23,6 +24,7 @@
       class="admin-starter-section__delete-form"
       onsubmit="return confirm('Remove this starter section and all its commands?');"
     >
+      {% include "partials/csrf_field.html" %}
       <button type="submit" class="admin-btn admin-btn--danger admin-btn--small">Delete section</button>
     </form>
   </header>
@@ -34,6 +36,7 @@
   </div>
 
   <form class="admin-add-row admin-add-entry" method="post" action="/admin/starter/sections/{{ section.id }}/entries">
+    {% include "partials/csrf_field.html" %}
     <label class="admin-field admin-field--tight">
       <span class="sr-only">Description</span>
       <input type="text" name="description" placeholder="New description" maxlength="4000" autocomplete="off" class="admin-text-input admin-text-input--grow">

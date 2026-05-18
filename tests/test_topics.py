@@ -88,7 +88,7 @@ def two_users_clients(client: TestClient, test_db: Session, register_invite: str
     test_db.commit()
     client.post(
         "/register",
-        data={"username": "bob2", "password": "pw", "invite_code": register_invite},
+        data={"username": "bob2", "password": "password", "invite_code": register_invite},
     )
     return client, topic.id
 

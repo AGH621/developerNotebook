@@ -51,6 +51,19 @@ def client(test_db: Session):
 
     application.dependency_overrides[get_db] = _override_get_db
     with TestClient(application, base_url="http://test", follow_redirects=False) as c:
+        _orig_request = c.request
+
+        def _request(method: str, url: str, **kwargs):
+            headers = kwargs.pop("headers", None)
+            if str(method).upper() in ("POST", "PUT", "PATCH", "DELETE"):
+                tok = c.cookies.get("csrftoken")
+                if tok:
+                    hdrs = dict(headers or {})
+                    hdrs.setdefault("x-csrftoken", tok)
+                    headers = hdrs
+            return _orig_request(method, url, headers=headers, **kwargs)
+
+        c.request = _request  # type: ignore[method-assign]
         yield c
     application.dependency_overrides.clear()
 
@@ -117,6 +130,9 @@ def seeded_client(
 
 
 @pytest.fixture(autouse=True)
-def _secret_key(monkeypatch: pytest.MonkeyPatch):
-    """Stable session signing secret for deterministic cookie tests."""
+def _test_env_security(monkeypatch: pytest.MonkeyPatch):
+    """Stable signing secret and HTTP-friendly cookies for Starlette TestClient."""
     monkeypatch.setenv("SECRET_KEY", "test-secret-for-pytest-only")
+    monkeypatch.setenv("SECURE_COOKIES", "false")
+    monkeypatch.setenv("APP_ENV", "dev")
+    monkeypatch.delenv("ALLOWED_HOSTS", raising=False)

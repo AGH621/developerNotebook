@@ -13,6 +13,7 @@
 {% endif %}
 
 <form class="admin-toolbar" method="post" action="/admin/starter/topics">
+  {% include "partials/csrf_field.html" %}
   <input type="text" name="name" placeholder="New starter topic title" maxlength="256" autocomplete="off" class="admin-text-input">
   <button type="submit" class="admin-btn admin-btn--primary">Add topic</button>
 </form>

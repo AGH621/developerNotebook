@@ -8,6 +8,7 @@
   {% endif %}
   {% if show_register_form %}
   <form method="post" action="/register" class="auth-form">
+    {% include "partials/csrf_field.html" %}
     <input type="hidden" name="invite_code" value="{{ invite_code }}">
     <label class="auth-form__field">
       <span>Username</span>

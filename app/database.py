@@ -1,5 +1,8 @@
-"""SQLite database engine, session factory, and FastAPI dependency."""
+"""Database engine, session factory, and FastAPI dependency."""
 
+from __future__ import annotations
+
+import os
 from collections.abc import Generator
 from pathlib import Path
 
@@ -8,12 +11,13 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DATABASE_URL = f"sqlite:///{_PROJECT_ROOT / 'notebook.db'}"
+_DEFAULT_SQLITE_URL = f"sqlite:///{_PROJECT_ROOT / 'notebook.db'}"
+DATABASE_URL = os.environ.get("DATABASE_URL", _DEFAULT_SQLITE_URL).strip() or _DEFAULT_SQLITE_URL
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False},
-)
+if DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+else:
+    engine = create_engine(DATABASE_URL)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -43,6 +47,18 @@ def apply_sqlite_user_column_migrations(engine: Engine) -> None:
     if "is_suspended" not in present:
         alters.append(
             "ALTER TABLE users ADD COLUMN is_suspended BOOLEAN NOT NULL DEFAULT 0",
+        )
+    if "session_version" not in present:
+        alters.append(
+            "ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 0",
+        )
+    if "failed_login_count" not in present:
+        alters.append(
+            "ALTER TABLE users ADD COLUMN failed_login_count INTEGER NOT NULL DEFAULT 0",
+        )
+    if "locked_until" not in present:
+        alters.append(
+            "ALTER TABLE users ADD COLUMN locked_until DATETIME",
         )
     if not alters:
         return

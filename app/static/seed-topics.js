@@ -1,0 +1,15 @@
+(function () {
+  document.querySelectorAll(".seed-topic-form").forEach(function (form) {
+    function boxes() {
+      return form.querySelectorAll('input[type="checkbox"][name="topic"]:not([disabled])');
+    }
+    form.querySelectorAll("[data-seed-topic-action]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var on = btn.getAttribute("data-seed-topic-action") === "all";
+        boxes().forEach(function (cb) {
+          cb.checked = on;
+        });
+      });
+    });
+  });
+})();

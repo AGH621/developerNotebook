@@ -33,7 +33,7 @@ def test_topic_page_with_slug(seeded_client: TestClient, test_db: Session) -> No
 def test_welcome_get_after_register(client: TestClient, test_db: Session, register_invite: str) -> None:
     client.post(
         "/register",
-        data={"username": "wel", "password": "pw", "invite_code": register_invite},
+        data={"username": "wel", "password": "pw-longer", "invite_code": register_invite},
     )
     r = client.get("/welcome")
     assert r.status_code == 200
@@ -49,7 +49,7 @@ def test_welcome_post_template_seeds(
 ) -> None:
     client.post(
         "/register",
-        data={"username": "tpl", "password": "pw", "invite_code": register_invite},
+        data={"username": "tpl", "password": "pw-longer", "invite_code": register_invite},
     )
     n = starter_catalog_topic_count(test_db)
     data = {"choice": "template", "topic": [str(i) for i in range(n)]}
@@ -68,7 +68,7 @@ def test_welcome_post_template_subset(
 ) -> None:
     client.post(
         "/register",
-        data={"username": "sub", "password": "pw", "invite_code": register_invite},
+        data={"username": "sub", "password": "pw-longer", "invite_code": register_invite},
     )
     r = client.post("/welcome", data={"choice": "template", "topic": "0"}, follow_redirects=False)
     assert r.status_code == 303
@@ -79,7 +79,7 @@ def test_welcome_post_template_subset(
 def test_welcome_post_template_requires_topic(client: TestClient, test_db: Session, register_invite: str) -> None:
     client.post(
         "/register",
-        data={"username": "needtp", "password": "pw", "invite_code": register_invite},
+        data={"username": "needtp", "password": "pw-longer", "invite_code": register_invite},
     )
     r = client.post("/welcome", data={"choice": "template"}, follow_redirects=False)
     assert r.status_code == 400
@@ -90,7 +90,7 @@ def test_welcome_post_template_requires_topic(client: TestClient, test_db: Sessi
 def test_welcome_post_blank_skips_seed(client: TestClient, test_db: Session, register_invite: str) -> None:
     client.post(
         "/register",
-        data={"username": "blk", "password": "pw", "invite_code": register_invite},
+        data={"username": "blk", "password": "pw-longer", "invite_code": register_invite},
     )
     r = client.post("/welcome", data={"choice": "blank"}, follow_redirects=False)
     assert r.status_code == 303
@@ -102,7 +102,7 @@ def test_welcome_post_blank_skips_seed(client: TestClient, test_db: Session, reg
 def test_seed_topics_get_ok_when_authenticated(client: TestClient, test_db: Session, register_invite: str) -> None:
     client.post(
         "/register",
-        data={"username": "seedpg", "password": "pw", "invite_code": register_invite},
+        data={"username": "seedpg", "password": "pw-longer", "invite_code": register_invite},
     )
     r = client.get("/seed-topics")
     assert r.status_code == 200
@@ -119,7 +119,7 @@ def test_seed_topics_post_appends_new_topic(
         pytest.skip("needs multiple starter topics")
     client.post(
         "/register",
-        data={"username": "apd", "password": "pw", "invite_code": register_invite},
+        data={"username": "apd", "password": "pw-longer", "invite_code": register_invite},
     )
     user = test_db.scalars(select(User).where(User.username == "apd")).one()
     existing_name = str(STARTER_DATA[0]["name"])

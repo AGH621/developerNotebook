@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -25,6 +25,12 @@ class User(Base):
         Whether the account may access the admin suite.
     is_suspended : bool
         When true, login is denied for this account.
+    session_version : int
+        Incremented to invalidate issued session cookies (password reset, suspend).
+    failed_login_count : int
+        Consecutive failed password attempts since the last successful login.
+    locked_until : datetime or None
+        When set and in the future, login is denied until this time passes.
     topics : list of Topic
         Topics belonging to this user, ordered by application logic.
     """
@@ -36,6 +42,9 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     is_suspended: Mapped[bool] = mapped_column(Boolean, default=False)
+    session_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    failed_login_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     topics: Mapped[list[Topic]] = relationship(
         back_populates="user",

@@ -10,6 +10,7 @@
   {% endif %}
 
   <form method="post" action="/seed-topics" class="welcome-card-form seed-topic-form">
+    {% include "partials/csrf_field.html" %}
     <div class="welcome-seed-panel welcome-seed-panel--standalone">
       <h2 class="welcome-card__title welcome-seed-panel__heading">Available starter topics</h2>
       <p class="welcome-card__body welcome-seed-panel__lead">Uncheck any technologies you do not want to add.</p>

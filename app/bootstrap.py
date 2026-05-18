@@ -8,7 +8,7 @@ import os
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.auth import hash_password
+from app.auth import hash_password, validate_password
 from app.models import StarterEntry, StarterSection, StarterTopic, User
 from app.seed_data import STARTER_DATA
 
@@ -40,6 +40,9 @@ def bootstrap_admin_from_env(db: Session) -> None:
 
     existing = db.scalars(select(User).where(User.username == username)).first()
     if existing is None:
+        pw_issue = validate_password(password)
+        if pw_issue:
+            logger.warning("Bootstrap admin: %s", pw_issue)
         db.add(
             User(
                 username=username,

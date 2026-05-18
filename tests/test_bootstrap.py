@@ -44,6 +44,21 @@ def test_bootstrap_admin_creates_user(monkeypatch: pytest.MonkeyPatch, test_db: 
     assert verify_password("phase-one-secret!", u.password_hash)
 
 
+def test_bootstrap_admin_warns_on_short_password(
+    monkeypatch: pytest.MonkeyPatch,
+    test_db: Session,
+    caplog: pytest.LogCaptureFixture,
+):
+    monkeypatch.setenv("ADMIN_USERNAME", "shorty")
+    monkeypatch.setenv("ADMIN_PASSWORD", "1234567")
+    with caplog.at_level("WARNING", logger="devnotebook.bootstrap"):
+        bootstrap_admin_from_env(test_db)
+        test_db.commit()
+    assert "8 characters" in caplog.text
+    u = test_db.scalars(select(User).where(User.username == "shorty")).one()
+    assert verify_password("1234567", u.password_hash)
+
+
 def test_bootstrap_admin_promotes_existing_without_password_change(
     monkeypatch: pytest.MonkeyPatch,
     test_db: Session,
