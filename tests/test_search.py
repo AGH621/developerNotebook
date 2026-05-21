@@ -39,6 +39,13 @@ def test_search_returns_results(notebook_section: Section, authenticated_client:
     assert b"search-results-wrap" in r.content
 
 
+def test_search_page_has_duckai_link(authenticated_client: TestClient) -> None:
+    r = authenticated_client.get("/search")
+    assert r.status_code == 200
+    assert b'https://duck.ai/' in r.content
+    assert b"Find new commands with Duck.ai" in r.content
+
+
 def test_search_empty_query(notebook_section: Section, authenticated_client: TestClient) -> None:
     authenticated_client.post(
         f"/sections/{notebook_section.id}/entries",
@@ -46,7 +53,18 @@ def test_search_empty_query(notebook_section: Section, authenticated_client: Tes
     )
     r = authenticated_client.get("/search", params={"q": "   "})
     assert r.status_code == 200
-    assert b"Type a search phrase" in r.content
+    assert b"search-results-wrap" not in r.content
+    assert b"Type a search phrase" not in r.content
+
+
+def test_search_htmx_empty_query_clears_results(authenticated_client: TestClient) -> None:
+    r = authenticated_client.get(
+        "/search",
+        params={"q": ""},
+        headers={"HX-Request": "true"},
+    )
+    assert r.status_code == 200
+    assert not r.content.strip()
 
 
 def test_search_htmx_partial(notebook_section: Section, authenticated_client: TestClient) -> None:
@@ -89,6 +107,25 @@ def test_nav_search_htmx_dropdown_is_compact_command_links(
     assert f'href="/topic/{topic.slug}#entry-row-'.encode("utf-8") in r.content
     assert b"entry-table" not in r.content
     assert b"DESCRIPTION" not in r.content
+
+
+def test_nav_search_duckai_link_in_navbar(authenticated_client: TestClient) -> None:
+    r = authenticated_client.get("/")
+    assert r.status_code == 200
+    assert b'id="nav-search-live"' in r.content
+    assert b'https://duck.ai/' in r.content
+    assert b"Find new commands with Duck.ai" in r.content
+    assert b'id="nav-search-results"' in r.content
+
+
+def test_nav_search_empty_query_clears_results_only(authenticated_client: TestClient) -> None:
+    r = authenticated_client.get(
+        "/search",
+        params={"q": "", "view": "nav"},
+        headers={"HX-Request": "true"},
+    )
+    assert r.status_code == 200
+    assert not r.content.strip()
 
 
 def test_search_no_cross_user_leakage(

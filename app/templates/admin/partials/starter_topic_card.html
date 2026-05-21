@@ -9,12 +9,31 @@
       <input type="text" name="name" value="{{ topic.name }}" maxlength="256" class="admin-text-input admin-text-input--grow" autocomplete="off">
       <button type="submit" class="admin-btn admin-btn--secondary">Save name</button>
     </form>
+    <form
+      method="post"
+      action="/admin/starter/topics/{{ topic.id }}/guest-visible"
+      class="admin-starter-card__guest-toggle"
+    >
+      {% include "partials/csrf_field.html" %}
+      <input type="hidden" name="guest_visible" value="0">
+      <label class="admin-checkbox-label">
+        <input
+          type="checkbox"
+          name="guest_visible"
+          value="1"
+          data-guest-visible-toggle
+          {% if topic.guest_visible %}checked{% endif %}
+        >
+        Visible to guests
+      </label>
+      <p class="admin-starter-card__guest-error" data-guest-visible-error hidden role="alert"></p>
+    </form>
     <div class="admin-starter-card__actions">
       <form
         method="post"
         action="/admin/starter/topics/{{ topic.id }}/delete"
         class="admin-starter-card__action-form"
-        onsubmit="return confirm({{ ('Delete starter topic ' ~ topic.name ~ ' and all sections and commands?') | tojson }});"
+        data-confirm="Delete starter topic {{ topic.name }} and all sections and commands?"
       >
         {% include "partials/csrf_field.html" %}
         <button type="submit" class="admin-btn admin-btn--danger admin-btn--small">

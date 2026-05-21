@@ -6,8 +6,13 @@
 <p class="admin-lede">Share a single-use signup link only with people who should receive an account.</p>
 
 {% if new_invite_link %}
-<p class="admin-flash admin-flash--ok" role="status">New invitation — copy link:</p>
-<p class="admin-invite-link"><code>{{ new_invite_link }}</code></p>
+<p class="admin-flash admin-flash--ok" role="status">New invitation created:</p>
+<div class="admin-invite-link">
+  <code>{{ new_invite_link }}</code>
+  {% with copy_text=new_invite_link %}
+  {% include "admin/partials/copy_link_button.html" %}
+  {% endwith %}
+</div>
 {% endif %}
 {% if ok_message %}
 <p class="admin-flash admin-flash--ok" role="status">{{ ok_message }}</p>

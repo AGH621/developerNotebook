@@ -1,0 +1,49 @@
+<details class="entry-row__menu">
+  <summary class="entry-row__menu-trigger">
+    <span class="sr-only">Entry actions</span>
+    <svg class="entry-row__sprite-icon entry-row__sprite-icon--trigger" aria-hidden="true"><use href="#sprite-topic-menu-arrow"/></svg>
+  </summary>
+  <div class="entry-row__menu-dropdown" role="group" aria-label="Entry actions">
+    <button
+      type="button"
+      class="entry-row__menu-item entry-copy"
+      data-command="{{ entry.command|e }}"
+      title="Copy"
+      aria-label="Copy command to clipboard"
+    >
+      <span class="entry-row__menu-item-icon" aria-hidden="true">
+        <svg><use href="#sprite-icon-copy"/></svg>
+      </span>
+      <span class="entry-row__menu-item-label">Copy</span>
+    </button>
+    <button
+      type="button"
+      class="entry-row__menu-item"
+      title="Edit"
+      aria-label="Edit entry"
+      hx-get="/entries/{{ entry.id }}/edit"
+      hx-target="#entry-row-{{ entry.id }}"
+      hx-swap="outerHTML"
+    >
+      <span class="entry-row__menu-item-icon" aria-hidden="true">
+        <svg><use href="#sprite-icon-edit"/></svg>
+      </span>
+      <span class="entry-row__menu-item-label">Edit</span>
+    </button>
+    <button
+      type="button"
+      class="entry-row__menu-item entry-row__menu-item--danger"
+      title="Delete"
+      aria-label="Delete entry"
+      hx-delete="/entries/{{ entry.id }}"
+      hx-target="#entry-row-{{ entry.id }}"
+      hx-swap="delete"
+      hx-confirm="Delete this entry?"
+    >
+      <span class="entry-row__menu-item-icon" aria-hidden="true">
+        <svg><use href="#sprite-topic-menu-delete"/></svg>
+      </span>
+      <span class="entry-row__menu-item-label">Delete</span>
+    </button>
+  </div>
+</details>

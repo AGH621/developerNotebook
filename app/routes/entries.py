@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Form, Request, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.auth import require_auth
+from app.auth import require_can_write
 from app.database import get_db
 from app.indexing import fts_delete, fts_insert, fts_update
 from app.models import Entry, Section, Topic, User
@@ -43,7 +43,7 @@ async def create_entry(
     section_id: int,
     description: Annotated[str | None, Form()] = None,
     command: Annotated[str | None, Form()] = None,
-    user: User = Depends(require_auth),
+    user: User = Depends(require_can_write),
     db: Session = Depends(get_db),
 ):
     """Append a command entry to a section owned by the current user.
@@ -110,7 +110,7 @@ async def create_entry(
 async def entry_edit_partial(
     request: Request,
     entry_id: int,
-    user: User = Depends(require_auth),
+    user: User = Depends(require_can_write),
     db: Session = Depends(get_db),
 ):
     """Return an inline two-field edit row for a command entry.
@@ -152,7 +152,7 @@ async def entry_edit_partial(
 async def entry_row_partial(
     request: Request,
     entry_id: int,
-    user: User = Depends(require_auth),
+    user: User = Depends(require_can_write),
     db: Session = Depends(get_db),
 ):
     """Return the read-only entry table row (used to cancel inline edits).
@@ -193,7 +193,7 @@ async def entry_row_partial(
 @router.put("/entries/reorder")
 async def reorder_entries(
     entry_order: Annotated[str, Form()],
-    user: User = Depends(require_auth),
+    user: User = Depends(require_can_write),
     db: Session = Depends(get_db),
 ):
     """Reorder entries inside one section from a SortableJS ID list.
@@ -257,7 +257,7 @@ async def update_entry(
     entry_id: int,
     description: Annotated[str, Form()],
     command: Annotated[str, Form()],
-    user: User = Depends(require_auth),
+    user: User = Depends(require_can_write),
     db: Session = Depends(get_db),
 ):
     """Update an entry's description and command text.
@@ -313,7 +313,7 @@ async def update_entry(
 @router.delete("/entries/{entry_id}")
 async def delete_entry(
     entry_id: int,
-    user: User = Depends(require_auth),
+    user: User = Depends(require_can_write),
     db: Session = Depends(get_db),
 ):
     """Delete a command entry row.

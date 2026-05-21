@@ -2,7 +2,9 @@
 <tr id="admin-user-{{ u.id }}" class="admin-user-row">
   <td>{{ u.username }}</td>
   <td>
-    {% if u.is_admin %}
+    {% if u.is_guest %}
+    <span class="admin-badge admin-badge--guest">Guest</span>
+    {% elif u.is_admin %}
     <span class="admin-badge admin-badge--admin">Admin</span>
     {% else %}
     <span class="admin-muted">—</span>
@@ -20,7 +22,7 @@
   <td>{{ row.topic_count }}</td>
   <td>
     <div class="admin-actions">
-    {% if row.is_self %}
+    {% if row.is_self or u.is_guest %}
     <span class="admin-muted" title="You cannot apply these actions to your own signed-in session on this row.">—</span>
     {% else %}
     <form method="post" action="/admin/users/{{ u.id }}/suspend" class="admin-inline-form">
@@ -35,7 +37,7 @@
     {% endif %}
     <form method="post" action="/admin/users/{{ u.id }}/delete"
           class="admin-inline-form"
-          onsubmit="return confirm('Delete {{ u.username }} and all notebooks?');">
+          data-confirm="Delete {{ u.username }} and all notebooks?">
       {% include "partials/csrf_field.html" %}
       <button type="submit" class="admin-btn admin-btn--danger admin-btn--small">Delete</button>
     </form>

@@ -1,13 +1,17 @@
+{% set read_only = read_only|default(false) %}
 <article
-  class="topic-card"
+  class="topic-card{% if read_only %} topic-card--readonly{% endif %}"
   id="topic-card-{{ topic.id }}"
   data-topic-id="{{ topic.id|string }}"
 >
   <div class="topic-card__toolbar">
+    {% if not read_only %}
     <button type="button" class="topic-card__drag" aria-label="Reorder topics" title="Drag to reorder">⋮⋮</button>
+    {% endif %}
     <div class="topic-card__body">
       <a class="topic-card__title" href="/topic/{{ topic.slug }}">{{ topic.name }}</a>
     </div>
+    {% if not read_only %}
     <div class="topic-card__actions">
       <details class="topic-card__menu">
         <summary class="topic-card__menu-trigger">
@@ -43,5 +47,6 @@
         </div>
       </details>
     </div>
+    {% endif %}
   </div>
 </article>

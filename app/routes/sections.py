@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Form, Request, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.auth import require_auth
+from app.auth import require_can_write
 from app.database import get_db
 from app.models import Section, Topic, User
 from app.routes.topics import _topic_owned, _topic_with_sections
@@ -87,7 +87,7 @@ async def create_section(
     request: Request,
     topic_id: int,
     name: Annotated[str | None, Form()] = None,
-    user: User = Depends(require_auth),
+    user: User = Depends(require_can_write),
     db: Session = Depends(get_db),
 ):
     """Append a named section to a topic owned by the current user.
@@ -146,7 +146,7 @@ async def create_section(
 async def section_edit_partial(
     request: Request,
     section_id: int,
-    user: User = Depends(require_auth),
+    user: User = Depends(require_can_write),
     db: Session = Depends(get_db),
 ):
     """Return an inline edit form for a section heading and notes.
@@ -196,7 +196,7 @@ async def section_edit_partial(
 async def section_view_partial(
     request: Request,
     section_id: int,
-    user: User = Depends(require_auth),
+    user: User = Depends(require_can_write),
     db: Session = Depends(get_db),
 ):
     """Return the read-only section block (cancel after inline edit).
@@ -236,7 +236,7 @@ async def section_view_partial(
 @router.put("/sections/reorder")
 async def reorder_sections(
     section_order: Annotated[str, Form()],
-    user: User = Depends(require_auth),
+    user: User = Depends(require_can_write),
     db: Session = Depends(get_db),
 ):
     """Reorder sections within a topic from a SortableJS ID list.
@@ -305,7 +305,7 @@ async def update_section(
     section_id: int,
     name: Annotated[str, Form()],
     notes: Annotated[str | None, Form()] = None,
-    user: User = Depends(require_auth),
+    user: User = Depends(require_can_write),
     db: Session = Depends(get_db),
 ):
     """Rename a section and update optional notes text.
@@ -362,7 +362,7 @@ async def update_section(
 async def delete_section(
     request: Request,
     section_id: int,
-    user: User = Depends(require_auth),
+    user: User = Depends(require_can_write),
     db: Session = Depends(get_db),
 ):
     """Delete a section and cascade-remove its entries.

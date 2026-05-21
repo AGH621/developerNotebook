@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Form, Request, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.auth import require_auth
+from app.auth import require_can_write
 from app.database import get_db
 from app.models import Section, Topic, User
 from app.slug import allocate_topic_slug
@@ -38,7 +38,7 @@ def _topic_with_sections(db: Session, topic_id: int) -> Topic | None:
 async def create_topic(
     request: Request,
     name: Annotated[str | None, Form()] = None,
-    user: User = Depends(require_auth),
+    user: User = Depends(require_can_write),
     db: Session = Depends(get_db),
 ):
     """Create an empty topic with one default unnamed section.
@@ -84,7 +84,7 @@ async def create_topic(
 async def topic_edit_partial(
     request: Request,
     topic_id: int,
-    user: User = Depends(require_auth),
+    user: User = Depends(require_can_write),
     db: Session = Depends(get_db),
 ):
     """Return an inline rename form replacing the topic card view.
@@ -126,7 +126,7 @@ async def topic_edit_partial(
 async def topic_card_partial(
     request: Request,
     topic_id: int,
-    user: User = Depends(require_auth),
+    user: User = Depends(require_can_write),
     db: Session = Depends(get_db),
 ):
     """Return the read-only topic card partial (restore after cancelling edit).
@@ -167,7 +167,7 @@ async def topic_card_partial(
 @router.put("/topics/reorder")
 async def reorder_topics(
     topic_order: Annotated[str, Form()],
-    user: User = Depends(require_auth),
+    user: User = Depends(require_can_write),
     db: Session = Depends(get_db),
 ):
     """Reorder topic cards by assigning ``display_order`` from posted IDs.
@@ -225,7 +225,7 @@ async def rename_topic(
     request: Request,
     topic_id: int,
     name: Annotated[str, Form()],
-    user: User = Depends(require_auth),
+    user: User = Depends(require_can_write),
     db: Session = Depends(get_db),
 ):
     """Rename a topic and regenerate its slug.
@@ -280,7 +280,7 @@ async def rename_topic(
 @router.delete("/topics/{topic_id}")
 async def delete_topic(
     topic_id: int,
-    user: User = Depends(require_auth),
+    user: User = Depends(require_can_write),
     db: Session = Depends(get_db),
 ):
     """Delete a topic and cascade-remove its sections and entries.

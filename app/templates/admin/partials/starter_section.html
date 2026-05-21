@@ -22,7 +22,7 @@
       method="post"
       action="/admin/starter/sections/{{ section.id }}/delete"
       class="admin-starter-section__delete-form"
-      onsubmit="return confirm('Remove this starter section and all its commands?');"
+      data-confirm="Remove this starter section and all its commands?"
     >
       {% include "partials/csrf_field.html" %}
       <button type="submit" class="admin-btn admin-btn--danger admin-btn--small">Delete section</button>

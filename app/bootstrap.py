@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import secrets
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -11,8 +12,12 @@ from sqlalchemy.orm import Session
 from app.auth import hash_password, validate_password
 from app.models import StarterEntry, StarterSection, StarterTopic, User
 from app.seed_data import STARTER_DATA
+from app.settings import ensure_app_settings
+from app.slug import allocate_starter_topic_slug
 
 logger = logging.getLogger("devnotebook.bootstrap")
+
+DEFAULT_GUEST_USERNAME = "__guest__"
 
 
 def bootstrap_admin_from_env(db: Session) -> None:
@@ -80,7 +85,12 @@ def seed_starter_catalog_if_empty(db: Session, topics_blob: list[dict]) -> bool:
         return False
 
     for t_order, topic_blob in enumerate(topics_blob):
-        topic = StarterTopic(name=str(topic_blob["name"]), display_order=t_order)
+        name = str(topic_blob["name"])
+        topic = StarterTopic(
+            name=name,
+            slug=allocate_starter_topic_slug(db, name),
+            display_order=t_order,
+        )
         db.add(topic)
         db.flush()
 
@@ -114,7 +124,55 @@ def seed_starter_catalog_if_empty(db: Session, topics_blob: list[dict]) -> bool:
     return True
 
 
+def ensure_starter_topic_slugs(db: Session) -> None:
+    """Backfill missing slugs on starter catalog rows (legacy databases)."""
+    topics = db.scalars(select(StarterTopic).order_by(StarterTopic.id.asc())).all()
+    for topic in topics:
+        slug = (topic.slug or "").strip()
+        if slug:
+            continue
+        topic.slug = allocate_starter_topic_slug(db, topic.name, exclude_topic_id=topic.id)
+
+
+def bootstrap_guest_user(db: Session) -> None:
+    """Ensure a single read-only guest account exists for one-click browsing."""
+    raw = os.environ.get("GUEST_USERNAME", DEFAULT_GUEST_USERNAME)
+    username = raw.strip() or DEFAULT_GUEST_USERNAME
+
+    existing_guest = db.scalars(select(User).where(User.is_guest.is_(True))).first()
+    if existing_guest is not None:
+        if existing_guest.username != username:
+            logger.warning(
+                "Guest account already exists as %r; GUEST_USERNAME=%r ignored.",
+                existing_guest.username,
+                username,
+            )
+        return
+
+    name_taken = db.scalars(select(User.id).where(User.username == username)).first()
+    if name_taken is not None:
+        logger.warning(
+            "Cannot create guest account: username %r is already taken by a non-guest user.",
+            username,
+        )
+        return
+
+    db.add(
+        User(
+            username=username,
+            password_hash=hash_password(secrets.token_urlsafe(32)),
+            is_guest=True,
+            is_admin=False,
+            is_suspended=False,
+        ),
+    )
+    logger.info("Guest account created (username=%r).", username)
+
+
 def run_startup_tasks(db: Session, *, starter_data: list[dict] | None = None) -> None:
     """Run admin bootstrap then optional starter-catalog seed."""
+    ensure_app_settings(db)
     bootstrap_admin_from_env(db)
     seed_starter_catalog_if_empty(db, starter_data if starter_data is not None else STARTER_DATA)
+    ensure_starter_topic_slugs(db)
+    bootstrap_guest_user(db)

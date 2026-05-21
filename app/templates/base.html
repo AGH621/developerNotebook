@@ -27,7 +27,7 @@
           autocomplete="off"
           hx-get="/search?view=nav"
           hx-trigger="keyup changed delay:300ms"
-          hx-target="#nav-search-live"
+          hx-target="#nav-search-results"
           hx-push-url="false"
         >
       </form>
@@ -36,8 +36,10 @@
         class="nav-search-live"
         role="region"
         aria-label="Live search results"
-        aria-live="polite"
-      ></div>
+      >
+        {% include "partials/nav_search_duckai.html" %}
+        <div id="nav-search-results" class="nav-search-results-slot" aria-live="polite"></div>
+      </div>
     </div>
     {% endif %}
     <div class="site-nav__theme">
@@ -56,16 +58,21 @@
     <a href="/admin" class="site-nav__admin">Admin</a>
     {% endif %}
     <a href="/index" class="site-nav__index">Index</a>
+    {% if not user.is_guest %}
     <a href="/seed-topics" class="site-nav__seed">Add cheatsheets</a>
-    <span class="site-nav__user">{{ user.username }}</span>
-    <form method="post" action="/logout" class="site-nav__logout">
-      {% include "partials/csrf_field.html" %}
-      <button type="submit">Log out</button>
-    </form>
+    {% endif %}
+    {% include "partials/site_nav_user_menu.html" %}
     {% endif %}
   </nav>
   <main class="site-main{% block main_extra_class %}{% endblock %}">
     {% block content %}{% endblock %}
   </main>
+  <dialog id="confirm-dialog" class="confirm-dialog" aria-labelledby="confirm-dialog-msg">
+    <p class="confirm-dialog__message" id="confirm-dialog-msg"></p>
+    <div class="confirm-dialog__actions">
+      <button type="button" class="confirm-dialog__btn confirm-dialog__btn--cancel">Cancel</button>
+      <button type="button" class="confirm-dialog__btn confirm-dialog__btn--danger" id="confirm-dialog-ok">Delete</button>
+    </div>
+  </dialog>
 </body>
 </html>

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import quote
 
 import bcrypt
 from fastapi import Depends, HTTPException, Request
@@ -16,11 +18,13 @@ from starlette.responses import Response
 
 from app.database import get_db
 from app.models import User
+from app.settings import get_session_timeouts
 
 SESSION_COOKIE_NAME = "session"
 _SESSION_SALT = "devnotebook-session"
 _DEV_FALLBACK_SECRET = "dev-only-insecure-secret-change-me"
 _dev_secret_warning_emitted = False
+_SESSION_EXPIRED_LOGIN = "/login?error=" + quote("Your session expired. Please log in again.")
 
 logger = logging.getLogger("devnotebook.auth")
 
@@ -136,55 +140,43 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
-def create_session(response: Response, user: User) -> None:
-    """Sign ``user`` identity and set the HTTP-only session cookie on ``response``.
+def _remaining_absolute_seconds(iat: int, absolute_minutes: int, now: float) -> int:
+    return max(0, int(iat + absolute_minutes * 60 - now))
 
-    Parameters
-    ----------
-    response : Response
-        Outgoing response (e.g. redirect) that will carry ``Set-Cookie``.
-    user : User
-        Authenticated user row (``id`` and ``session_version`` are serialized).
 
-    Returns
-    -------
-    None
-        Mutates ``response`` in place.
-    """
-    token = _session_serializer().dumps(
-        {"user_id": user.id, "session_version": user.session_version},
-    )
+def _session_expired(
+    payload: dict[str, int],
+    absolute_minutes: int,
+    idle_minutes: int,
+    now: float,
+) -> bool:
+    iat = payload["iat"]
+    last_activity = payload["last_activity"]
+    if now - iat > absolute_minutes * 60:
+        return True
+    return now - last_activity > idle_minutes * 60
+
+
+def _set_session_cookie(
+    response: Response,
+    payload: dict[str, int],
+    absolute_minutes: int,
+) -> None:
+    now = time.time()
+    max_age = _remaining_absolute_seconds(payload["iat"], absolute_minutes, now)
+    token = _session_serializer().dumps(payload)
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
         value=token,
         httponly=True,
         samesite="lax",
         path="/",
-        max_age=60 * 60 * 24 * 14,
+        max_age=max_age,
         secure=session_cookie_secure(),
     )
 
 
-def get_current_user(request: Request, db: Session) -> User | None:
-    """Load the logged-in user from the session cookie, if valid.
-
-    Parameters
-    ----------
-    request : Request
-        Incoming request; the session cookie is read from it.
-    db : Session
-        Database session used to load ``User`` by primary key.
-
-    Returns
-    -------
-    User or None
-        The user when the cookie is present, well-formed, refers to an
-        existing row, ``session_version`` matches, and the account is not
-        suspended; otherwise ``None``.
-    """
-    raw = request.cookies.get(SESSION_COOKIE_NAME)
-    if not raw:
-        return None
+def _load_session_payload(raw: str) -> dict[str, int] | None:
     try:
         payload = _session_serializer().loads(raw)
     except BadSignature:
@@ -194,51 +186,122 @@ def get_current_user(request: Request, db: Session) -> User | None:
         return None
     user_id = payload.get("user_id")
     cookie_ver = payload.get("session_version")
-    if not isinstance(user_id, int) or not isinstance(cookie_ver, int):
+    iat = payload.get("iat")
+    last_activity = payload.get("last_activity")
+    if not all(
+        isinstance(v, int)
+        for v in (user_id, cookie_ver, iat, last_activity)
+    ):
         return None
-    user = db.scalars(select(User).where(User.id == user_id)).first()
+    return {
+        "user_id": user_id,
+        "session_version": cookie_ver,
+        "iat": iat,
+        "last_activity": last_activity,
+    }
+
+
+def create_session(response: Response, user: User, db: Session) -> None:
+    """Sign ``user`` identity and set the HTTP-only session cookie on ``response``."""
+    absolute_minutes, _idle_minutes = get_session_timeouts(db)
+    now = int(time.time())
+    payload = {
+        "user_id": user.id,
+        "session_version": user.session_version,
+        "iat": now,
+        "last_activity": now,
+    }
+    _set_session_cookie(response, payload, absolute_minutes)
+
+
+def refresh_session_cookie(
+    response: Response,
+    user: User,
+    payload: dict[str, int],
+    db: Session,
+) -> None:
+    """Extend idle timeout by updating ``last_activity`` on the session cookie."""
+    absolute_minutes, _idle_minutes = get_session_timeouts(db)
+    now = int(time.time())
+    new_payload = {
+        "user_id": user.id,
+        "session_version": user.session_version,
+        "iat": payload["iat"],
+        "last_activity": now,
+    }
+    _set_session_cookie(response, new_payload, absolute_minutes)
+
+
+def _resolve_session(request: Request, db: Session) -> tuple[User, dict[str, int]] | None:
+    raw = request.cookies.get(SESSION_COOKIE_NAME)
+    if not raw:
+        return None
+    payload = _load_session_payload(raw)
+    if payload is None:
+        return None
+
+    absolute_minutes, idle_minutes = get_session_timeouts(db)
+    now = time.time()
+    if _session_expired(payload, absolute_minutes, idle_minutes, now):
+        logger.info("Session expired user_id=%s", payload["user_id"])
+        return None
+
+    user = db.scalars(select(User).where(User.id == payload["user_id"])).first()
     if user is None:
-        logger.debug("Session references missing user id=%s", user_id)
+        logger.debug("Session references missing user id=%s", payload["user_id"])
         return None
-    if user.session_version != cookie_ver:
-        logger.info("Session rejected stale session_version user_id=%s", user_id)
+    if user.session_version != payload["session_version"]:
+        logger.info("Session rejected stale session_version user_id=%s", user.id)
         return None
     if user.is_suspended:
-        logger.info("Session denied for suspended user id=%s", user_id)
+        logger.info("Session denied for suspended user id=%s", user.id)
         return None
+    return user, payload
+
+
+def get_current_user(request: Request, db: Session) -> User | None:
+    """Load the logged-in user from the session cookie, if valid."""
+    result = _resolve_session(request, db)
+    if result is None:
+        return None
+    user, _payload = result
     return user
 
 
 def require_auth(
     request: Request,
+    response: Response,
     db: Session = Depends(get_db),
 ) -> User:
-    """FastAPI dependency: require a valid session or redirect to login.
-
-    Parameters
-    ----------
-    request : Request
-        Current request.
-    db : Session
-        Database session from :func:`app.database.get_db`.
-
-    Returns
-    -------
-    User
-        The authenticated user.
-
-    Raises
-    ------
-    HTTPException
-        With status 303 and ``Location: /login`` when there is no valid session.
-    """
-    user = get_current_user(request, db)
-    if user is None:
+    """FastAPI dependency: require a valid session or redirect to login."""
+    raw = request.cookies.get(SESSION_COOKIE_NAME)
+    if not raw:
         raise HTTPException(
             status_code=303,
             detail="Not authenticated",
             headers={"Location": "/login"},
         )
+
+    result = _resolve_session(request, db)
+    if result is None:
+        payload = _load_session_payload(raw)
+        absolute_minutes, idle_minutes = get_session_timeouts(db)
+        if payload is not None and _session_expired(
+            payload,
+            absolute_minutes,
+            idle_minutes,
+            time.time(),
+        ):
+            location = _SESSION_EXPIRED_LOGIN
+        else:
+            location = "/login"
+        raise HTTPException(
+            status_code=303,
+            detail="Not authenticated",
+            headers={"Location": location},
+        )
+    user, payload = result
+    refresh_session_cookie(response, user, payload, db)
     return user
 
 
@@ -252,4 +315,11 @@ def require_admin(user: User = Depends(require_auth)) -> User:
     """
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required.")
+    return user
+
+
+def require_can_write(user: User = Depends(require_auth)) -> User:
+    """FastAPI dependency: require a session that may modify notebook content."""
+    if user.is_guest:
+        raise HTTPException(status_code=403, detail="Read-only account.")
     return user

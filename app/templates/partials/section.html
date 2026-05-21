@@ -1,17 +1,20 @@
+{% set read_only = read_only|default(false) %}
 <section
-  class="topic-section"
+  class="topic-section{% if read_only %} topic-section--readonly{% endif %}"
   id="section-{{ section.id }}"
   data-section-id="{{ section.id|string }}"
 >
   <header class="topic-section__header">
     <div class="topic-section__toolbar">
       <div class="topic-section__toolbar-main">
+        {% if not read_only %}
         <button
           type="button"
           class="topic-section__drag"
           aria-label="Reorder sections"
           title="Drag to reorder"
         >⋮⋮</button>
+        {% endif %}
         <div class="topic-section__heading">
           <h2
             class="topic-section__title{% if hide_section_chrome %} topic-section__title--placeholder{% endif %}"
@@ -27,6 +30,7 @@
           </h2>
         </div>
       </div>
+      {% if not read_only %}
       <div class="topic-section__toolbar-end">
         <div class="topic-section__actions">
           <button
@@ -58,6 +62,7 @@
           </button>
         </div>
       </div>
+      {% endif %}
     </div>
     {% if section.notes %}
     <p class="topic-section__notes">{{ section.notes }}</p>
@@ -66,6 +71,7 @@
 
   <div class="topic-section__body">
     <div class="entry-table-wrap">
+      {% if not read_only %}
       <form
         id="add-entry-form-{{ section.id }}"
         class="add-form add-form--entry add-form--entry-associate"
@@ -73,10 +79,16 @@
         hx-target="#entries-tbody-{{ section.id }}"
         hx-swap="beforeend"
       ></form>
+      {% endif %}
       <table
         class="entry-table"
         aria-labelledby="section-heading-{{ section.id }}"
       >
+        <colgroup>
+          <col class="entry-table__col-desc">
+          <col class="entry-table__col-cmd">
+          <col class="entry-table__col-actions">
+        </colgroup>
         <thead>
           <tr>
             <th class="entry-table__col-desc" scope="col">Description</th>
@@ -86,19 +98,21 @@
         </thead>
         <tbody
           id="entries-tbody-{{ section.id }}"
-          class="entry-tbody"
+          class="entry-tbody{% if read_only %} entry-tbody--readonly{% endif %}"
           data-section-id="{{ section.id|string }}"
         >
           {% for entry in section.entries|sort(attribute='display_order') %}
             {% include "partials/entry_row.html" %}
           {% endfor %}
         </tbody>
+        {% if not read_only %}
         <tfoot class="entry-table__add-foot">
           <tr>
             {% set submit_label = "+ Add Entry" %}
             {% include "partials/add_form_entry_tfoot.html" %}
           </tr>
         </tfoot>
+        {% endif %}
       </table>
     </div>
   </div>

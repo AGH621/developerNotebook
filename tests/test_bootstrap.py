@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth import hash_password, verify_password
-from app.bootstrap import bootstrap_admin_from_env, run_startup_tasks, seed_starter_catalog_if_empty
+from app.bootstrap import bootstrap_admin_from_env, bootstrap_guest_user, run_startup_tasks, seed_starter_catalog_if_empty
 from app.models import StarterEntry, StarterTopic, User
 
 _MINI_STARTER: list[dict] = [
@@ -127,3 +127,20 @@ def test_run_startup_tasks_runs_admin_and_seed(monkeypatch: pytest.MonkeyPatch, 
     entries = test_db.scalars(select(StarterEntry)).all()
     assert len(topics) == 1
     assert len(entries) == 1
+
+
+def test_bootstrap_guest_user_creates_read_only_account(test_db: Session):
+    bootstrap_guest_user(test_db)
+    test_db.commit()
+    guest = test_db.scalars(select(User).where(User.is_guest.is_(True))).one()
+    assert guest.is_admin is False
+    assert guest.is_suspended is False
+
+
+def test_bootstrap_guest_user_is_idempotent(test_db: Session):
+    bootstrap_guest_user(test_db)
+    test_db.commit()
+    bootstrap_guest_user(test_db)
+    test_db.commit()
+    guests = test_db.scalars(select(User).where(User.is_guest.is_(True))).all()
+    assert len(guests) == 1

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
@@ -19,6 +20,7 @@ from app.auth import (
     get_current_user,
     hash_password,
     require_auth,
+    require_can_write,
     session_cookie_secure,
     validate_password,
     verify_password,
@@ -27,6 +29,7 @@ from app.database import get_db
 from app.rate_limit import limiter
 from app.models import Invitation, Section, Topic, User
 from app.routes.sections import _topic_context_flags
+from app.services.guest import guest_topic_by_slug, guest_visible_topics, sorted_starter_sections
 from app.services.seed import (
     populate_starter_data,
     starter_catalog_topic_count,
@@ -37,6 +40,18 @@ from app.templating import templates
 
 router = APIRouter()
 auth_log = logging.getLogger("devnotebook.auth")
+
+
+def _guest_login_available(db: Session) -> bool:
+    return db.scalars(select(User.id).where(User.is_guest.is_(True))).first() is not None
+
+
+def _login_template_ctx(db: Session, **extra: object) -> dict[str, object]:
+    return {
+        "user": None,
+        "guest_available": _guest_login_available(db),
+        **extra,
+    }
 
 
 @router.get("/")
@@ -61,15 +76,18 @@ async def home(
     TemplateResponse
         Renders ``home.html`` with the user's topics in display order.
     """
-    topics = db.scalars(
-        select(Topic)
-        .where(Topic.user_id == user.id)
-        .order_by(Topic.display_order.asc(), Topic.id.asc()),
-    ).all()
+    if user.is_guest:
+        topics = guest_visible_topics(db)
+    else:
+        topics = db.scalars(
+            select(Topic)
+            .where(Topic.user_id == user.id)
+            .order_by(Topic.display_order.asc(), Topic.id.asc()),
+        ).all()
     return templates.TemplateResponse(
         request,
         "home.html",
-        {"user": user, "topics": topics},
+        {"user": user, "topics": topics, "read_only": user.is_guest},
     )
 
 
@@ -109,6 +127,31 @@ async def topic_detail(
             selectinload(Topic.sections).selectinload(Section.entries),
         ),
     ).first()
+    read_only = user.is_guest
+    if user.is_guest:
+        starter = guest_topic_by_slug(db, slug)
+        if starter is None:
+            raise HTTPException(status_code=404, detail="Topic not found")
+        sections = sorted_starter_sections(starter)
+        for section in sections:
+            section.entries = sorted(
+                section.entries,
+                key=lambda e: (e.display_order, e.id),
+            )
+        hide_chrome, show_sidebar = _topic_context_flags(starter)
+        return templates.TemplateResponse(
+            request,
+            "topic.html",
+            {
+                "user": user,
+                "topic": starter,
+                "sections": sections,
+                "hide_section_chrome": hide_chrome,
+                "show_section_sidebar": show_sidebar,
+                "read_only": True,
+            },
+        )
+
     if topic is None:
         raise HTTPException(status_code=404, detail="Topic not found")
 
@@ -123,6 +166,7 @@ async def topic_detail(
             "sections": sections,
             "hide_section_chrome": hide_chrome,
             "show_section_sidebar": show_sidebar,
+            "read_only": read_only,
         },
     )
 
@@ -157,10 +201,12 @@ async def login_get(request: Request, db: Session = Depends(get_db)):
     if user is not None:
         return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
     err = request.query_params.get("error")
+    ok = request.query_params.get("ok")
+    guest_available = _guest_login_available(db)
     return templates.TemplateResponse(
         request,
         "login.html",
-        {"error": err, "user": None},
+        {"error": err, "ok": ok, "user": None, "guest_available": guest_available},
     )
 
 
@@ -198,10 +244,7 @@ async def login_post(
         return templates.TemplateResponse(
             request,
             "login.html",
-            {
-                "error": "Username and password are required.",
-                "user": None,
-            },
+            _login_template_ctx(db, error="Username and password are required."),
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -211,11 +254,20 @@ async def login_post(
         return templates.TemplateResponse(
             request,
             "login.html",
-            {
-                "error": "Unknown username or incorrect password.",
-                "user": None,
-            },
+            _login_template_ctx(db, error="Unknown username or incorrect password."),
             status_code=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    if row.is_guest:
+        auth_log.warning("Login rejected password attempt for guest account username=%s", name)
+        return templates.TemplateResponse(
+            request,
+            "login.html",
+            _login_template_ctx(
+                db,
+                error="Use Browse as guest on this page instead of signing in as the guest account.",
+            ),
+            status_code=status.HTTP_403_FORBIDDEN,
         )
 
     _LOCKOUT_THRESHOLD = 11
@@ -228,10 +280,10 @@ async def login_post(
         return templates.TemplateResponse(
             request,
             "login.html",
-            {
-                "error": "Account temporarily locked due to too many failed attempts. Try again later.",
-                "user": None,
-            },
+            _login_template_ctx(
+                db,
+                error="Account temporarily locked due to too many failed attempts. Try again later.",
+            ),
             status_code=status.HTTP_403_FORBIDDEN,
         )
 
@@ -249,10 +301,7 @@ async def login_post(
         return templates.TemplateResponse(
             request,
             "login.html",
-            {
-                "error": "Unknown username or incorrect password.",
-                "user": None,
-            },
+            _login_template_ctx(db, error="Unknown username or incorrect password."),
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
 
@@ -261,10 +310,10 @@ async def login_post(
         return templates.TemplateResponse(
             request,
             "login.html",
-            {
-                "error": "This account has been suspended. Contact an administrator.",
-                "user": None,
-            },
+            _login_template_ctx(
+                db,
+                error="This account has been suspended. Contact an administrator.",
+            ),
             status_code=status.HTTP_403_FORBIDDEN,
         )
 
@@ -273,7 +322,41 @@ async def login_post(
     db.commit()
     auth_log.info("Login succeeded username=%s user_id=%s", name, row.id)
     response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
-    create_session(response, row)
+    create_session(response, row, db)
+    return response
+
+
+@router.post("/guest-login")
+@limiter.limit("10/minute")
+async def guest_login_post(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Start a read-only session as the shared guest account."""
+    guest = db.scalars(select(User).where(User.is_guest.is_(True))).first()
+    if guest is None:
+        auth_log.warning("Guest login failed: no guest account configured")
+        return templates.TemplateResponse(
+            request,
+            "login.html",
+            _login_template_ctx(db, error="Guest browsing is not available right now."),
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+    if guest.is_suspended:
+        auth_log.warning("Guest login blocked suspended guest user_id=%s", guest.id)
+        return templates.TemplateResponse(
+            request,
+            "login.html",
+            _login_template_ctx(
+                db,
+                error="Guest browsing is temporarily unavailable. Contact an administrator.",
+            ),
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
+    auth_log.info("Guest login succeeded user_id=%s username=%s", guest.id, guest.username)
+    response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+    create_session(response, guest, db)
     return response
 
 
@@ -299,14 +382,15 @@ async def register_get(
     TemplateResponse
         Rendered ``register.html`` with or without the signup form.
     RedirectResponse
-        Redirects to ``/`` when already logged in.
+        Redirects to ``/`` when already logged in as a full account.
     """
     user = get_current_user(request, db)
-    if user is not None:
+    if user is not None and not user.is_guest:
         return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
+    nav_user = user if user is not None and user.is_guest else None
     qp_error = request.query_params.get("error")
-    ctx_base = {"user": None, "invite_code": None, "show_register_form": False}
+    ctx_base = {"user": nav_user, "invite_code": None, "show_register_form": False}
     if qp_error:
         return templates.TemplateResponse(
             request,
@@ -345,7 +429,7 @@ async def register_get(
         request,
         "register.html",
         {
-            "user": None,
+            "user": nav_user,
             "error": None,
             "show_register_form": True,
             "invite_code": raw_code,
@@ -366,6 +450,8 @@ async def register_post(
 
     Requires a valid, unused invitation matched by ``invite_code``.
     """
+    session_user = get_current_user(request, db)
+    nav_user = session_user if session_user is not None and session_user.is_guest else None
 
     def _invite_error_response(msg: str, *, status_cd: int) -> Response:
         return templates.TemplateResponse(
@@ -373,7 +459,7 @@ async def register_post(
             "register.html",
             {
                 "error": msg,
-                "user": None,
+                "user": nav_user,
                 "show_register_form": False,
                 "invite_code": None,
             },
@@ -423,7 +509,7 @@ async def register_post(
     db.refresh(user)
     auth_log.info("User registered username=%s user_id=%s", name, user.id)
     response = RedirectResponse(url="/welcome", status_code=status.HTTP_303_SEE_OTHER)
-    create_session(response, user)
+    create_session(response, user, db)
     return response
 
 
@@ -433,24 +519,9 @@ async def welcome_get(
     user: User = Depends(require_auth),
     db: Session = Depends(get_db),
 ):
-    """Choose starter template versus a blank notebook (one-time onboarding).
-
-    Parameters
-    ----------
-    request : Request
-        Incoming HTTP request.
-    user : User
-        Authenticated user from :func:`app.auth.require_auth`.
-    db : Session
-        Database session for checking existing topics.
-
-    Returns
-    -------
-    TemplateResponse
-        Renders ``welcome.html`` when the account has no topics yet.
-    RedirectResponse
-        Redirects to ``/`` if the user already has at least one topic.
-    """
+    """Choose starter template versus a blank notebook (one-time onboarding)."""
+    if user.is_guest:
+        return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
     if db.scalars(select(Topic.id).where(Topic.user_id == user.id)).first() is not None:
         return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
     return templates.TemplateResponse(
@@ -488,30 +559,10 @@ def _parse_topic_indices(form_values: list[str], *, n_topics: int) -> frozenset[
 @router.post("/welcome")
 async def welcome_post(
     request: Request,
-    user: User = Depends(require_auth),
+    user: User = Depends(require_can_write),
     db: Session = Depends(get_db),
 ):
-    """Apply the onboarding choice then send the client to the home page.
-
-    Parameters
-    ----------
-    request : Request
-        Used to render ``welcome.html`` when validation fails. Form fields:
-        ``choice`` (``template`` or ``blank``), and ``topic`` (repeated indices
-        when ``choice`` is ``template``).
-    user : User
-        Authenticated user from :func:`app.auth.require_auth`.
-    db : Session
-        Database session for inserting seeded rows.
-
-    Returns
-    -------
-    RedirectResponse
-        Redirects to ``/`` after a successful choice (or when topics already
-        exist).
-    TemplateResponse
-        Re-renders ``welcome.html`` on invalid ``choice`` with HTTP 400.
-    """
+    """Apply the onboarding choice then send the client to the home page."""
     if db.scalars(select(Topic.id).where(Topic.user_id == user.id)).first() is not None:
         return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -557,6 +608,8 @@ async def seed_topics_get(
     db: Session = Depends(get_db),
 ):
     """Pick bundled cheatsheets to add to an existing notebook."""
+    if user.is_guest:
+        return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
     return templates.TemplateResponse(
         request,
         "seed_topics.html",
@@ -571,7 +624,7 @@ async def seed_topics_get(
 @router.post("/seed-topics")
 async def seed_topics_post(
     request: Request,
-    user: User = Depends(require_auth),
+    user: User = Depends(require_can_write),
     db: Session = Depends(get_db),
 ):
     """Insert selected starter topics that the user does not already have."""
@@ -616,6 +669,150 @@ async def seed_topics_post(
     )
     db.commit()
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/change-password")
+async def change_password_get(
+    request: Request,
+    user: User = Depends(require_auth),
+):
+    """Show the change-password form for the logged-in user."""
+    if user.is_guest:
+        return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+    ok = request.query_params.get("ok")
+    return templates.TemplateResponse(
+        request,
+        "change_password.html",
+        {"user": user, "error": None, "success": ok == "1"},
+    )
+
+
+@router.post("/change-password")
+async def change_password_post(
+    request: Request,
+    user: User = Depends(require_can_write),
+    db: Session = Depends(get_db),
+    current_password: Annotated[str, Form()] = "",
+    new_password: Annotated[str, Form()] = "",
+    confirm_password: Annotated[str, Form()] = "",
+):
+    """Update the logged-in user's password after verifying the current one."""
+    ctx = {"user": user, "error": None, "success": False}
+
+    if not current_password or not new_password or not confirm_password:
+        ctx["error"] = "All fields are required."
+        return templates.TemplateResponse(
+            request,
+            "change_password.html",
+            ctx,
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not verify_password(current_password, user.password_hash):
+        auth_log.warning("Change password failed bad current password user_id=%s", user.id)
+        ctx["error"] = "Current password is incorrect."
+        return templates.TemplateResponse(
+            request,
+            "change_password.html",
+            ctx,
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    if new_password != confirm_password:
+        ctx["error"] = "New password and confirmation do not match."
+        return templates.TemplateResponse(
+            request,
+            "change_password.html",
+            ctx,
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    pw_err = validate_password(new_password)
+    if pw_err:
+        ctx["error"] = pw_err
+        return templates.TemplateResponse(
+            request,
+            "change_password.html",
+            ctx,
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    user.password_hash = hash_password(new_password)
+    db.commit()
+    auth_log.info("Password changed user_id=%s", user.id)
+    return RedirectResponse(
+        url="/change-password?ok=1",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.get("/delete-account")
+async def delete_account_get(
+    request: Request,
+    user: User = Depends(require_auth),
+):
+    """Show account deletion confirmation (password required to proceed)."""
+    if user.is_guest:
+        return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+    if user.is_admin:
+        return RedirectResponse(
+            url="/change-password",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    return templates.TemplateResponse(
+        request,
+        "delete_account.html",
+        {"user": user, "error": None},
+    )
+
+
+@router.post("/delete-account")
+async def delete_account_post(
+    request: Request,
+    user: User = Depends(require_can_write),
+    db: Session = Depends(get_db),
+    password: Annotated[str, Form()] = "",
+):
+    """Permanently delete the logged-in account after password confirmation."""
+    if not password:
+        return templates.TemplateResponse(
+            request,
+            "delete_account.html",
+            {"user": user, "error": "Password is required to confirm deletion."},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not verify_password(password, user.password_hash):
+        auth_log.warning("Delete account failed bad password user_id=%s", user.id)
+        return templates.TemplateResponse(
+            request,
+            "delete_account.html",
+            {"user": user, "error": "Password is incorrect."},
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    if user.is_admin:
+        return templates.TemplateResponse(
+            request,
+            "delete_account.html",
+            {
+                "user": user,
+                "error": "Administrator accounts cannot be deleted here.",
+            },
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
+    uname = user.username
+    user_id = user.id
+    db.delete(user)
+    db.commit()
+    auth_log.warning("User deleted own account user_id=%s username=%s", user_id, uname)
+    response = RedirectResponse(
+        url="/login?ok=" + quote("Your account has been deleted."),
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+    _clear_session_cookie(response)
+    return response
 
 
 @router.post("/logout")

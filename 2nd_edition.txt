@@ -1,34 +1,36 @@
 Second Edition
 
-1. Admin console
-	e. allow user to request an invitation via email (see pinned Cursor chat)
-
-3. Style refinements
-	k. dark mode
-	l. inoperative dark mode button on login screen --> why?
-	m. need a copy button for invitation links
-	n. clean up command level buttons (make them look like technology level ones)
+1. Admin 
+	e. allow user to request an invitation via email (see pinned Cursor chat) --> at deploy
+	
 
 4. Features
-	j. user reset own password
-	e. if there is a list of commands in a single cell, can we have separate copy buttons for each? --> too busy?
-	
+	h. Make the navbar user name a dropdown containing the change password and log out buttons
+
+	e. POSTPONE: if there is a list of commands in a single cell, can we have separate copy buttons for each? (too busy)	
 	f. POSTPONE: for commands that need variables: select a command, textbox overlay to compose exactly what is wanted (variables, etc.), textbox has copy button, close button (or click away to close) [otherwise straight copy is ok]
 		i. difficult because users may not use <> to indicate variables --> offer as default to all commands?
 	g. POSTPONE: user sets command variables temporarily? (have a default)
 
+
 5. Security: 
-	a. Application only knows character strings (nothing about commands or executing commands)
+	a. Application only knows character strings (nothing about commands or executing commands) --> ask Cursor about this
+	
 
 6. Guest account:
 	a. read only
 	b. cannot add/delete/edit any data
 	c. can copy commands to clipboard
 	d. has a limited set of seed technologies (which?)
+	
 
-7. Better search [from Cursor chat on 17 May 2026]
+X. Better search [from Cursor chat on 17 May 2026]
 	FTS stands for Full-Text Search. An FTS table is a special virtual table in SQLite (specifically you're using FTS5, the latest version) that builds an inverted index over text content — essentially the same kind of index that powers search engines like Google. It lets you do fast keyword searches across large amounts of text, including things like prefix matching, phrase matching, and ranking by relevance.
 	
 	Your app doesn't actually use it for search right now. Search is done with plain LIKE queries directly against the entries table. The FTS table is being maintained (kept in sync with writes) but not read from — it's there as a future optimization path in case the dataset grows large enough that LIKE queries become slow.
 
 	For a personal developer notebook, LIKE-based search is probably fine for a long time. FTS would start to matter if you had thousands of entries and wanted sub-millisecond search, ranked results, or more advanced query syntax like "python AND regex".
+
+
+Y. Fix mobile view problems
+	a. section navigation disappears when you scroll down the page

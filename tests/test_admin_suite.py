@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 from starlette.testclient import TestClient
 
 from app.auth import hash_password, verify_password
-from app.models import Invitation, StarterEntry, StarterSection, StarterTopic, User
+from app.models import AppSettings, Invitation, StarterEntry, StarterSection, StarterTopic, User
+from app.settings import SETTINGS_ROW_ID, invalidate_settings_cache
 
 
 def _admin_login(client: TestClient, db: Session) -> None:
@@ -32,6 +33,34 @@ def test_admin_dashboard_renders(client: TestClient, test_db: Session):
     r = client.get("/admin")
     assert r.status_code == 200
     assert b"Users" in r.content
+    assert b"Session timeouts" in r.content
+
+
+def test_admin_updates_session_timeouts(client: TestClient, test_db: Session):
+    _admin_login(client, test_db)
+    r = client.post(
+        "/admin/settings/session-timeouts",
+        data={"session_absolute_minutes": "120", "session_idle_minutes": "30"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert "ok=" in (r.headers.get("location") or "")
+    invalidate_settings_cache()
+    settings = test_db.get(AppSettings, SETTINGS_ROW_ID)
+    assert settings is not None
+    assert settings.session_absolute_minutes == 120
+    assert settings.session_idle_minutes == 30
+
+
+def test_admin_rejects_invalid_session_timeouts(client: TestClient, test_db: Session):
+    _admin_login(client, test_db)
+    r = client.post(
+        "/admin/settings/session-timeouts",
+        data={"session_absolute_minutes": "10", "session_idle_minutes": "30"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert "error=" in (r.headers.get("location") or "")
 
 
 def test_create_and_revoke_invitation(client: TestClient, test_db: Session):
@@ -49,6 +78,16 @@ def test_create_and_revoke_invitation(client: TestClient, test_db: Session):
     rev = client.post(f"/admin/invites/{inv_id}/revoke", follow_redirects=False)
     assert rev.status_code == 303
     assert test_db.scalar(select(func.count(Invitation.id))) == 0
+
+
+def test_invites_page_includes_copy_buttons(client: TestClient, test_db: Session):
+    _admin_login(client, test_db)
+    client.post("/admin/invites", follow_redirects=True)
+    r = client.get("/admin/invites")
+    assert r.status_code == 200
+    assert b'data-copy-text="' in r.content
+    assert b"copy-btn admin-copy-btn" in r.content
+    assert b"/register?code=" in r.content
 
 
 def test_generate_invitation_creates_second_code(client: TestClient, test_db: Session, register_invite: str):

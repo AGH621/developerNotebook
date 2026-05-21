@@ -14,6 +14,7 @@ from app.database import Base, apply_sqlite_user_column_migrations, get_db
 from app.indexing import ensure_fts_table
 from app.main import create_app
 from app.models import Invitation, User
+from app.settings import ensure_app_settings, invalidate_settings_cache
 
 TEST_USERNAME = "testuser"
 TEST_PASSWORD = "test-pass-please-123"
@@ -33,6 +34,8 @@ def test_db() -> Session:
     ensure_fts_table(engine)
     factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     db = factory()
+    ensure_app_settings(db)
+    db.commit()
     try:
         yield db
     finally:
@@ -136,3 +139,4 @@ def _test_env_security(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("SECURE_COOKIES", "false")
     monkeypatch.setenv("APP_ENV", "dev")
     monkeypatch.delenv("ALLOWED_HOSTS", raising=False)
+    invalidate_settings_cache()

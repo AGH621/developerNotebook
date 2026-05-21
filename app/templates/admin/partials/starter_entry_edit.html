@@ -21,7 +21,7 @@
     method="post"
     action="/admin/starter/entries/{{ entry.id }}/delete"
     class="admin-entry-edit__remove"
-    onsubmit="return confirm('Delete this starter command row?');"
+    data-confirm="Delete this starter command row?"
   >
     {% include "partials/csrf_field.html" %}
     <button type="submit" class="admin-btn admin-btn--danger admin-btn--small admin-entry-edit__remove-btn">

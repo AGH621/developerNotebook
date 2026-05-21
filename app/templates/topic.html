@@ -1,8 +1,16 @@
 {% extends "base.html" %}
+{% set read_only = read_only|default(false) %}
 {% block title %}{{ topic.name }} — Developer Notebook{% endblock %}
 {% block main_extra_class %} site-main--topic{% endblock %}
 {% block content %}
 <div class="topic-shell">
+  {% if read_only %}
+  <p class="guest-banner" role="status">
+    Read-only guest view.
+    <a href="/register">Create a full account</a> — invitation link required.
+  </p>
+  {% endif %}
+
   <header class="topic-header">
     <p class="topic-back"><a href="/">← Topics</a></p>
     <h1 class="topic-title">{{ topic.name }}</h1>
@@ -20,6 +28,7 @@
     {% endfor %}
   </div>
 
+  {% if not read_only %}
   <footer class="topic-footer">
     <div class="topic-footer__add-section">
       {% set action = "/topics/" ~ topic.id ~ "/sections" %}
@@ -30,7 +39,10 @@
       {% include "partials/add_form.html" %}
     </div>
   </footer>
+  {% endif %}
 </div>
 
+{% if not read_only %}
 <script src="/static/topic.js" defer></script>
+{% endif %}
 {% endblock %}

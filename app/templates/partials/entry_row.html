@@ -1,16 +1,19 @@
+{% set read_only = read_only|default(false) %}
 <tr
-  class="entry-row"
+  class="entry-row{% if read_only %} entry-row--readonly{% endif %}"
   id="entry-row-{{ entry.id }}"
   data-entry-id="{{ entry.id|string }}"
 >
   <td class="entry-row__description">
     <div class="entry-row__description-inner">
+      {% if not read_only %}
       <button
         type="button"
         class="entry-row__drag"
         aria-label="Reorder entries"
         title="Drag to reorder"
       >⋮⋮</button>
+      {% endif %}
       <div class="entry-row__ellipsis-line">
         <span class="entry-row__description-text">{{ entry.description }}</span>
         {% if entry.description.strip() %}
@@ -41,46 +44,23 @@
       {% endif %}
     </div>
   </td>
+  {% if not read_only %}
   <td class="entry-row__actions">
-    <div class="entry-row__actions-inner">
-      <button
-        type="button"
-        class="entry-copy entry-row__btn icon-label-btn"
-        data-command="{{ entry.command|e }}"
-        title="Copy"
-        aria-label="Copy command to clipboard"
-      >
-        <span class="icon-label-btn__icon" aria-hidden="true">
-          <svg><use href="#sprite-icon-copy"/></svg>
-        </span>
-      </button>
-      <button
-        type="button"
-        class="entry-row__btn icon-label-btn"
-        title="Edit"
-        aria-label="Edit entry"
-        hx-get="/entries/{{ entry.id }}/edit"
-        hx-target="#entry-row-{{ entry.id }}"
-        hx-swap="outerHTML"
-      >
-        <span class="icon-label-btn__icon" aria-hidden="true">
-          <svg><use href="#sprite-icon-edit"/></svg>
-        </span>
-      </button>
-      <button
-        type="button"
-        class="entry-row__btn entry-row__btn--danger icon-label-btn"
-        title="Delete"
-        aria-label="Delete entry"
-        hx-delete="/entries/{{ entry.id }}"
-        hx-target="#entry-row-{{ entry.id }}"
-        hx-swap="delete"
-        hx-confirm="Delete this entry?"
-      >
-        <span class="icon-label-btn__icon" aria-hidden="true">
-          <svg><use href="#sprite-topic-menu-delete"/></svg>
-        </span>
-      </button>
-    </div>
+    {% include "partials/entry_actions_menu.html" %}
   </td>
+  {% else %}
+  <td class="entry-row__actions entry-row__actions--readonly">
+    <button
+      type="button"
+      class="entry-copy entry-row__copy-btn icon-label-btn"
+      data-command="{{ entry.command|e }}"
+      title="Copy command"
+      aria-label="Copy command to clipboard"
+    >
+      <span class="icon-label-btn__icon" aria-hidden="true">
+        <svg><use href="#sprite-icon-copy"/></svg>
+      </span>
+    </button>
+  </td>
+  {% endif %}
 </tr>

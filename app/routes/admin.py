@@ -23,7 +23,13 @@ from app.models import (
     Topic,
     User,
 )
-from app.templating import templates
+from app.settings import (
+    get_app_settings,
+    invalidate_settings_cache,
+    validate_session_timeout_minutes,
+)
+from app.slug import allocate_starter_topic_slug
+from app.templating import invite_register_url, templates
 
 # include_in_schema=False hides routes from the OpenAPI document only; every path
 # still enforces auth via require_admin — it is not an access-control mechanism.
@@ -43,11 +49,6 @@ def _admin_count(db: Session) -> int:
 
 def _topic_count_for_user(db: Session, user_id: int) -> int:
     return int(db.scalar(select(func.count(Topic.id)).where(Topic.user_id == user_id)) or 0)
-
-
-def _invite_register_url(request: Request, code: str) -> str:
-    base = str(request.base_url).rstrip("/")
-    return f"{base}/register?code={quote(code, safe='')}"
 
 
 def _unique_invite_code(db: Session) -> str:
@@ -87,6 +88,7 @@ async def admin_dashboard(
 
     qp_error = request.query_params.get("error")
     qp_ok = request.query_params.get("ok")
+    app_settings = get_app_settings(db)
     return templates.TemplateResponse(
         request,
         "admin/dashboard.html",
@@ -96,7 +98,43 @@ async def admin_dashboard(
             "error": qp_error,
             "ok_message": qp_ok,
             "now_utc": datetime.now(timezone.utc).replace(tzinfo=None),
+            "app_settings": app_settings,
         },
+    )
+
+
+@router.post("/settings/session-timeouts", include_in_schema=False)
+async def admin_update_session_timeouts(
+    session_absolute_minutes: Annotated[int, Form()],
+    session_idle_minutes: Annotated[int, Form()],
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(require_admin),
+):
+    """Update absolute and idle session timeout values."""
+    err = validate_session_timeout_minutes(
+        session_absolute_minutes,
+        session_idle_minutes,
+    )
+    if err:
+        return RedirectResponse(
+            url="/admin?error=" + quote(err),
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    settings = get_app_settings(db)
+    settings.session_absolute_minutes = session_absolute_minutes
+    settings.session_idle_minutes = session_idle_minutes
+    db.commit()
+    invalidate_settings_cache()
+    admin_log.info(
+        "admin=%s updated session timeouts absolute=%s idle=%s",
+        admin_user.id,
+        session_absolute_minutes,
+        session_idle_minutes,
+    )
+    return RedirectResponse(
+        url="/admin?ok=" + quote("Session timeouts updated."),
+        status_code=status.HTTP_303_SEE_OTHER,
     )
 
 
@@ -172,6 +210,12 @@ async def admin_delete_user(
     target = db.get(User, user_id)
     if target is None:
         raise HTTPException(status_code=404, detail="User not found")
+
+    if target.is_guest:
+        return RedirectResponse(
+            url="/admin?error=" + quote("The shared guest account cannot be deleted."),
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
 
     if target.is_admin and _admin_count(db) == 1:
         return RedirectResponse(
@@ -254,7 +298,7 @@ async def admin_invites(
     qp_ok = request.query_params.get("ok")
     created_code = request.query_params.get("created")
     new_link = (
-        _invite_register_url(request, created_code.strip())
+        invite_register_url(request, created_code.strip())
         if created_code and created_code.strip()
         else None
     )
@@ -362,7 +406,11 @@ async def admin_starter_add_topic(
     label = (name or "").strip() or "New topic"
     next_ord = db.scalar(select(func.coalesce(func.max(StarterTopic.display_order), -1)))
     slot = int(next_ord) + 1 if next_ord is not None else 0
-    topic = StarterTopic(name=label, display_order=slot)
+    topic = StarterTopic(
+        name=label,
+        slug=allocate_starter_topic_slug(db, label),
+        display_order=slot,
+    )
     db.add(topic)
     db.commit()
     frag = f"#admin-starter-topic-{topic.id}"
@@ -381,6 +429,7 @@ def _starter_topic_save_response(
     lab = (name or "").strip()
     if lab:
         topic.name = lab
+        topic.slug = allocate_starter_topic_slug(db, lab, exclude_topic_id=topic.id)
     db.commit()
     frag = f"#admin-starter-topic-{topic_id}"
     return _htmx_or_redirect(request, "/admin/starter" + frag)
@@ -406,6 +455,22 @@ async def admin_starter_save_topic_form(
     name: Annotated[str | None, Form()] = None,
 ):
     return _starter_topic_save_response(request, db, topic_id, name)
+
+
+@router.post("/starter/topics/{topic_id}/guest-visible", include_in_schema=False)
+async def admin_starter_set_guest_visible(
+    topic_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+    guest_visible: Annotated[str | None, Form()] = None,
+):
+    """Toggle whether a starter topic appears in the read-only guest catalog."""
+    topic = db.get(StarterTopic, topic_id)
+    if topic is None:
+        raise HTTPException(status_code=404, detail="Starter topic not found")
+    topic.guest_visible = (guest_visible or "").strip().lower() in ("1", "true", "on", "yes")
+    db.commit()
+    return Response(status_code=204)
 
 
 def _starter_topic_delete_response(request: Request, db: Session, topic_id: int) -> Response:

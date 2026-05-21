@@ -1,0 +1,27 @@
+<details class="site-nav__user-menu">
+  <summary class="site-nav__user-menu-trigger" aria-haspopup="menu">
+    {% if user.is_guest %}Guest{% else %}{{ user.username }}{% endif %}
+  </summary>
+  <div class="site-nav__user-menu-dropdown" role="menu" aria-label="Account">
+    {% if user.is_guest %}
+    <a href="/register" class="site-nav__user-menu-item" role="menuitem">
+      Create a full account
+    </a>
+    {% else %}
+    <a href="/change-password" class="site-nav__user-menu-item" role="menuitem">
+      Change password
+    </a>
+    {% if not user.is_admin %}
+    <a href="/delete-account" class="site-nav__user-menu-item site-nav__user-menu-item--danger" role="menuitem">
+      Delete account
+    </a>
+    {% endif %}
+    {% endif %}
+    <form method="post" action="/logout" class="site-nav__user-menu-logout">
+      {% include "partials/csrf_field.html" %}
+      <button type="submit" class="site-nav__user-menu-item" role="menuitem">
+        Log out
+      </button>
+    </form>
+  </div>
+</details>

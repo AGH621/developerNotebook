@@ -147,7 +147,7 @@ def test_invitation_created_and_redeemed_by_users(test_db: Session):
 
 
 def test_cascade_delete_starter_topic_removes_sections_and_entries(test_db: Session):
-    topic = StarterTopic(name="T", display_order=0)
+    topic = StarterTopic(name="T", slug="t", display_order=0)
     test_db.add(topic)
     test_db.flush()
     section = StarterSection(topic_id=topic.id, name="S", display_order=0)

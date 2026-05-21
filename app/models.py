@@ -23,6 +23,8 @@ class User(Base):
         Bcrypt hash of the user's password.
     is_admin : bool
         Whether the account may access the admin suite.
+    is_guest : bool
+        When true, the account is read-only and sees admin-selected starter topics.
     is_suspended : bool
         When true, login is denied for this account.
     session_version : int
@@ -41,6 +43,7 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(150), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_guest: Mapped[bool] = mapped_column(Boolean, default=False)
     is_suspended: Mapped[bool] = mapped_column(Boolean, default=False)
     session_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     failed_login_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
@@ -191,6 +194,8 @@ class StarterTopic(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(256))
+    slug: Mapped[str] = mapped_column(String(256), unique=True, index=True)
+    guest_visible: Mapped[bool] = mapped_column(Boolean, default=False)
     display_order: Mapped[int] = mapped_column(default=0)
 
     sections: Mapped[list[StarterSection]] = relationship(
@@ -218,6 +223,16 @@ class StarterSection(Base):
         back_populates="section",
         cascade="all, delete-orphan",
     )
+
+
+class AppSettings(Base):
+    """Singleton application settings (row ``id=1``)."""
+
+    __tablename__ = "app_settings"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    session_absolute_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
+    session_idle_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
 class StarterEntry(Base):

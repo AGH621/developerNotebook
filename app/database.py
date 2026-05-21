@@ -27,7 +27,7 @@ class Base(DeclarativeBase):
 
 
 def apply_sqlite_user_column_migrations(engine: Engine) -> None:
-    """Add ``is_admin`` / ``is_suspended`` to ``users`` when missing (legacy DBs).
+    """Add legacy columns to ``users`` / ``starter_topics`` when missing.
 
     The app uses ``create_all`` without Alembic; new installs get columns from
     the ORM. Existing SQLite files need ``ALTER TABLE`` when those fields were
@@ -36,35 +36,53 @@ def apply_sqlite_user_column_migrations(engine: Engine) -> None:
     if engine.dialect.name != "sqlite":
         return
     inspector = inspect(engine)
-    if not inspector.has_table("users"):
-        return
-    present = {c["name"] for c in inspector.get_columns("users")}
-    alters: list[str] = []
-    if "is_admin" not in present:
-        alters.append(
-            "ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0",
-        )
-    if "is_suspended" not in present:
-        alters.append(
-            "ALTER TABLE users ADD COLUMN is_suspended BOOLEAN NOT NULL DEFAULT 0",
-        )
-    if "session_version" not in present:
-        alters.append(
-            "ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 0",
-        )
-    if "failed_login_count" not in present:
-        alters.append(
-            "ALTER TABLE users ADD COLUMN failed_login_count INTEGER NOT NULL DEFAULT 0",
-        )
-    if "locked_until" not in present:
-        alters.append(
-            "ALTER TABLE users ADD COLUMN locked_until DATETIME",
-        )
-    if not alters:
-        return
-    with engine.begin() as conn:
-        for stmt in alters:
-            conn.execute(text(stmt))
+    if inspector.has_table("users"):
+        present = {c["name"] for c in inspector.get_columns("users")}
+        alters: list[str] = []
+        if "is_admin" not in present:
+            alters.append(
+                "ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0",
+            )
+        if "is_suspended" not in present:
+            alters.append(
+                "ALTER TABLE users ADD COLUMN is_suspended BOOLEAN NOT NULL DEFAULT 0",
+            )
+        if "session_version" not in present:
+            alters.append(
+                "ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 0",
+            )
+        if "failed_login_count" not in present:
+            alters.append(
+                "ALTER TABLE users ADD COLUMN failed_login_count INTEGER NOT NULL DEFAULT 0",
+            )
+        if "locked_until" not in present:
+            alters.append(
+                "ALTER TABLE users ADD COLUMN locked_until DATETIME",
+            )
+        if "is_guest" not in present:
+            alters.append(
+                "ALTER TABLE users ADD COLUMN is_guest BOOLEAN NOT NULL DEFAULT 0",
+            )
+        if alters:
+            with engine.begin() as conn:
+                for stmt in alters:
+                    conn.execute(text(stmt))
+
+    if inspector.has_table("starter_topics"):
+        starter_cols = {c["name"] for c in inspector.get_columns("starter_topics")}
+        starter_alters: list[str] = []
+        if "guest_visible" not in starter_cols:
+            starter_alters.append(
+                "ALTER TABLE starter_topics ADD COLUMN guest_visible BOOLEAN NOT NULL DEFAULT 0",
+            )
+        if "slug" not in starter_cols:
+            starter_alters.append(
+                "ALTER TABLE starter_topics ADD COLUMN slug VARCHAR(256)",
+            )
+        if starter_alters:
+            with engine.begin() as conn:
+                for stmt in starter_alters:
+                    conn.execute(text(stmt))
 
 
 def get_db() -> Generator[Session, None, None]:

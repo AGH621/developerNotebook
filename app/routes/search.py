@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import require_auth
 from app.database import get_db
-from app.indexing import build_index_page_sections, search_entries
+from app.indexing import build_index_page_sections, build_index_page_sections_guest, search_entries, search_guest_entries
 from app.models import User
 from app.templating import templates
 
@@ -26,7 +26,10 @@ async def search_page(
 ):
     """Full search page, HTMX results table (search page), or compact nav dropdown."""
     query = (q or "").strip()
-    results = search_entries(db, user.id, query)
+    if user.is_guest:
+        results = search_guest_entries(db, query)
+    else:
+        results = search_entries(db, user.id, query)
 
     hx = request.headers.get("hx-request") or ""
     is_htmx = hx.strip().lower() == "true"
@@ -54,7 +57,10 @@ async def index_overview(
     db: Session = Depends(get_db),
 ):
     """Auto-generated alphabetical index: one table per starting letter."""
-    letter_sections = build_index_page_sections(db, user.id)
+    if user.is_guest:
+        letter_sections = build_index_page_sections_guest(db)
+    else:
+        letter_sections = build_index_page_sections(db, user.id)
     return templates.TemplateResponse(
         request,
         "index.html",

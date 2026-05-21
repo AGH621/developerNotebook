@@ -38,6 +38,7 @@ def test_apply_sqlite_user_column_migrations_adds_missing_columns():
     assert "session_version" in cols
     assert "failed_login_count" in cols
     assert "locked_until" in cols
+    assert "is_guest" in cols
 
     factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     db = factory()

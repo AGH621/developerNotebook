@@ -15,7 +15,7 @@ from sqlalchemy import or_, select, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
-from app.models import Entry, Section, Topic
+from app.models import Entry, Section, StarterEntry, StarterSection, StarterTopic, Topic
 
 FTS_VIRTUAL_DDL = """
 CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5(
@@ -188,6 +188,54 @@ def search_entries(db: Session, user_id: int, query: str) -> list[dict[str, Any]
     ]
 
 
+def search_guest_entries(db: Session, query: str) -> list[dict[str, Any]]:
+    """Search guest-visible starter catalog entries matching ``query``."""
+    trimmed = query.strip()
+    if not trimmed:
+        return []
+    tokens = [p.strip() for p in re.split(r"\s+", trimmed) if p.strip()]
+    if not tokens:
+        return []
+
+    stmt = (
+        select(
+            StarterEntry.id.label("entry_id"),
+            StarterEntry.description,
+            StarterEntry.command,
+            StarterTopic.name.label("topic_name"),
+            StarterTopic.slug.label("topic_slug"),
+            StarterSection.name.label("section_name"),
+        )
+        .join(StarterSection, StarterEntry.section_id == StarterSection.id)
+        .join(StarterTopic, StarterSection.topic_id == StarterTopic.id)
+        .where(StarterTopic.guest_visible.is_(True))
+    )
+
+    for tok in tokens:
+        pattern = f"%{_sql_like_escape(tok)}%"
+        stmt = stmt.where(
+            or_(
+                StarterEntry.description.ilike(pattern, escape="\\"),
+                StarterEntry.command.ilike(pattern, escape="\\"),
+            ),
+        )
+
+    stmt = stmt.order_by(StarterEntry.description.asc(), StarterEntry.id.asc()).limit(50)
+
+    rows = db.execute(stmt).mappings().all()
+    return [
+        {
+            "entry_id": row["entry_id"],
+            "description": row["description"],
+            "command": row["command"],
+            "topic_name": row["topic_name"],
+            "topic_slug": row["topic_slug"],
+            "section_name": row["section_name"] or "",
+        }
+        for row in rows
+    ]
+
+
 def _first_word(description: str) -> str | None:
     parts = description.strip().split(None, 1)
     return parts[0] if parts else None
@@ -292,6 +340,56 @@ def build_index_page_sections(db: Session, user_id: int) -> list[dict[str, Any]]
         .join(Topic, Section.topic_id == Topic.id)
         .where(Topic.user_id == user_id)
         .order_by(Entry.description.asc(), Entry.id.asc())
+    )
+
+    by_letter: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in db.execute(stmt).all():
+        desc = row.description
+        item = {
+            "entry_id": row.id,
+            "description": desc,
+            "command": row.command,
+            "topic_name": row.topic_name,
+            "topic_slug": row.topic_slug,
+            "section_name": row.section_name or "",
+        }
+        by_letter[_browse_letter(desc)].append(item)
+
+    sections: list[dict[str, Any]] = []
+    for letter in sorted(
+        by_letter.keys(),
+        key=lambda L: ("\uffff", L.lower()) if L == "#" else (L.casefold(), L),
+    ):
+        rows_here = by_letter[letter]
+        rows_here.sort(
+            key=lambda r: (
+                _description_first_word_key(str(r["description"])),
+                str(r["description"]).casefold(),
+                int(r["entry_id"]),
+            ),
+        )
+        anchor = "sym" if letter == "#" else letter
+        sections.append({"letter": letter, "anchor": anchor, "entries": rows_here})
+
+    return sections
+
+
+def build_index_page_sections_guest(db: Session) -> list[dict[str, Any]]:
+    """Letter-grouped index for guest-visible starter catalog entries."""
+    stmt = (
+        select(
+            StarterEntry.id,
+            StarterEntry.description,
+            StarterEntry.command,
+            StarterTopic.name.label("topic_name"),
+            StarterTopic.slug.label("topic_slug"),
+            StarterSection.name.label("section_name"),
+        )
+        .select_from(StarterEntry)
+        .join(StarterSection, StarterEntry.section_id == StarterSection.id)
+        .join(StarterTopic, StarterSection.topic_id == StarterTopic.id)
+        .where(StarterTopic.guest_visible.is_(True))
+        .order_by(StarterEntry.description.asc(), StarterEntry.id.asc())
     )
 
     by_letter: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)

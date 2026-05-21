@@ -12,6 +12,49 @@
 <p class="admin-flash admin-flash--err" role="alert">{{ error }}</p>
 {% endif %}
 
+<section class="admin-settings-panel" aria-labelledby="session-timeouts-heading">
+  <h2 id="session-timeouts-heading" class="admin-settings-panel__title">Session timeouts</h2>
+  <p class="admin-settings-panel__help">
+    Sessions end when either limit is reached. <strong>Absolute</strong> is the maximum time since login.
+    <strong>Idle</strong> is the maximum time without a request. Users must sign in again after deploy if
+    their browser still has an old session cookie without timestamps.
+  </p>
+  <form method="post" action="/admin/settings/session-timeouts" class="admin-settings-form">
+    {% include "partials/csrf_field.html" %}
+    <div class="admin-settings-form__row">
+      <label for="session-absolute-minutes" class="admin-settings-form__label">
+        Absolute timeout (minutes)
+      </label>
+      <input
+        type="number"
+        id="session-absolute-minutes"
+        name="session_absolute_minutes"
+        class="admin-settings-form__input"
+        value="{{ app_settings.session_absolute_minutes }}"
+        min="{{ app_settings.session_idle_minutes }}"
+        max="525600"
+        required
+      >
+    </div>
+    <div class="admin-settings-form__row">
+      <label for="session-idle-minutes" class="admin-settings-form__label">
+        Idle timeout (minutes)
+      </label>
+      <input
+        type="number"
+        id="session-idle-minutes"
+        name="session_idle_minutes"
+        class="admin-settings-form__input"
+        value="{{ app_settings.session_idle_minutes }}"
+        min="5"
+        max="10080"
+        required
+      >
+    </div>
+    <button type="submit" class="admin-btn admin-btn--primary">Save timeouts</button>
+  </form>
+</section>
+
 <div class="admin-table-scroll">
 <table class="admin-table admin-table--users">
   <thead>

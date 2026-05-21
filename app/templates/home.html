@@ -3,8 +3,16 @@
 {% block main_extra_class %} site-main--home{% endblock %}
 {% block content %}
 <div class="home-shell">
+  {% if read_only %}
+  <p class="guest-banner" role="status">
+    You are browsing as a guest (read-only).
+    <a href="/register">Create a full account</a> — invitation link required.
+  </p>
+  {% endif %}
+
   <header class="home-header">
     <h1>Topics</h1>
+    {% if not read_only %}
     <div class="home-header__actions">
       {% set action = "/topics" %}
       {% set target = "#topic-grid" %}
@@ -13,14 +21,21 @@
       {% set submit_label = "+ Topic" %}
       {% include "partials/add_form.html" %}
     </div>
+    {% endif %}
   </header>
 
-  <div id="topic-grid" class="topic-grid">
+  {% if read_only and not topics %}
+  <p class="home-empty">Nothing currently available. Check back later.</p>
+  {% else %}
+  <div id="topic-grid" class="topic-grid{% if read_only %} topic-grid--readonly{% endif %}">
     {% for topic in topics %}
       {% include "partials/topic_card.html" %}
     {% endfor %}
   </div>
+  {% endif %}
 </div>
 
+{% if not read_only %}
 <script src="/static/home.js" defer></script>
+{% endif %}
 {% endblock %}

@@ -2,13 +2,24 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+from unittest.mock import patch
+
 import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from starlette.testclient import TestClient
 
-from app.auth import hash_password, validate_password, verify_password
-from app.models import Invitation, User
+from app.auth import _session_serializer, hash_password, validate_password, verify_password
+from app.models import AppSettings, Invitation, User
+from app.settings import (
+    DEFAULT_SESSION_ABSOLUTE_MINUTES,
+    DEFAULT_SESSION_IDLE_MINUTES,
+    SETTINGS_ROW_ID,
+    ensure_app_settings,
+    invalidate_settings_cache,
+)
+from tests.conftest import TEST_PASSWORD, TEST_USERNAME
 
 
 def test_hash_and_verify_round_trip():
@@ -168,6 +179,38 @@ def test_logout_clears_session(client: TestClient, test_db: Session, register_in
     assert client.cookies.get("session") in (None, "")
 
 
+def test_nav_user_menu_links(authenticated_client: TestClient):
+    r = authenticated_client.get("/")
+    assert r.status_code == 200
+    assert b"site-nav__user-menu" in r.content
+    assert TEST_USERNAME.encode() in r.content
+    assert b'href="/change-password"' in r.content
+    assert b'href="/delete-account"' in r.content
+    assert b'action="/logout"' in r.content
+    assert b"Change password" in r.content
+    assert b"Delete account" in r.content
+    assert b"Log out" in r.content
+
+
+def test_nav_user_menu_hides_delete_for_admin(client: TestClient, test_db: Session):
+    test_db.add(
+        User(
+            username="navadmin",
+            password_hash=hash_password("navadmin-pw-9"),
+            is_admin=True,
+            is_suspended=False,
+        )
+    )
+    test_db.commit()
+    client.post("/login", data={"username": "navadmin", "password": "navadmin-pw-9"})
+    r = client.get("/")
+    assert r.status_code == 200
+    assert b"site-nav__user-menu" in r.content
+    assert b"navadmin" in r.content
+    assert b"Delete account" not in r.content
+    assert b'href="/delete-account"' not in r.content
+
+
 def test_home_redirects_when_unauthenticated(client: TestClient):
     r = client.get("/")
     assert r.status_code == 303
@@ -232,3 +275,196 @@ def test_authenticated_topic_slug_accessible(_registered: TestClient, test_db: S
     r = _registered.get(f"/topic/{slug}", follow_redirects=False)
     assert r.status_code == 200
     assert b"Git" in r.content
+
+
+def test_change_password_requires_auth(client: TestClient):
+    r = client.get("/change-password", follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers.get("location") == "/login"
+
+
+def test_change_password_rejects_wrong_current(authenticated_client: TestClient):
+    r = authenticated_client.post(
+        "/change-password",
+        data={
+            "current_password": "wrong",
+            "new_password": "new-secret-99",
+            "confirm_password": "new-secret-99",
+        },
+    )
+    assert r.status_code == 401
+    assert b"incorrect" in r.content.lower()
+
+
+def test_change_password_success(authenticated_client: TestClient, test_db: Session):
+    r = authenticated_client.post(
+        "/change-password",
+        data={
+            "current_password": "test-pass-please-123",
+            "new_password": "updated-secret-99",
+            "confirm_password": "updated-secret-99",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert r.headers.get("location") == "/change-password?ok=1"
+
+    authenticated_client.post("/logout")
+    assert (
+        authenticated_client.post(
+            "/login",
+            data={"username": "testuser", "password": "test-pass-please-123"},
+        ).status_code
+        == 401
+    )
+    r_login = authenticated_client.post(
+        "/login",
+        data={"username": "testuser", "password": "updated-secret-99"},
+    )
+    assert r_login.status_code == 303
+    row = test_db.scalars(select(User).where(User.username == "testuser")).one()
+    assert verify_password("updated-secret-99", row.password_hash)
+
+
+def test_delete_account_requires_auth(client: TestClient):
+    r = client.get("/delete-account", follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers.get("location") == "/login"
+
+
+def test_delete_account_removes_user_and_data(
+    seeded_client: TestClient,
+    test_db: Session,
+):
+    from sqlalchemy import func
+
+    from app.models import Topic
+
+    user = test_db.scalars(select(User).where(User.username == "testuser")).one()
+    topic_count_before = test_db.scalar(select(func.count(Topic.id)).where(Topic.user_id == user.id))
+    assert topic_count_before and topic_count_before > 0
+
+    r = seeded_client.post(
+        "/delete-account",
+        data={"password": "test-pass-please-123"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert r.headers.get("location", "").startswith("/login?ok=")
+    assert test_db.scalars(select(User).where(User.username == "testuser")).first() is None
+    assert test_db.scalar(select(func.count(Topic.id)).where(Topic.user_id == user.id)) == 0
+
+
+def test_delete_account_blocks_admin(client: TestClient, test_db: Session):
+    admin = User(
+        username="adminuser",
+        password_hash=hash_password("admin-pw-9"),
+        is_admin=True,
+        is_suspended=False,
+    )
+    test_db.add(admin)
+    test_db.commit()
+
+    client.post("/login", data={"username": "adminuser", "password": "admin-pw-9"})
+    r_get = client.get("/delete-account", follow_redirects=False)
+    assert r_get.status_code == 303
+    assert r_get.headers.get("location") == "/change-password"
+
+    r_post = client.post(
+        "/delete-account",
+        data={"password": "admin-pw-9"},
+        follow_redirects=False,
+    )
+    assert r_post.status_code == 403
+    assert b"administrator accounts cannot be deleted" in r_post.content.lower()
+    assert test_db.scalars(select(User).where(User.username == "adminuser")).first() is not None
+
+
+def _set_session_timeouts(test_db: Session, *, absolute: int, idle: int) -> None:
+    settings = test_db.get(AppSettings, SETTINGS_ROW_ID)
+    assert settings is not None
+    settings.session_absolute_minutes = absolute
+    settings.session_idle_minutes = idle
+    test_db.commit()
+    invalidate_settings_cache()
+
+
+@contextmanager
+def _frozen_time(when: float):
+    """Patch wall clock and auth clock (httpx cookie jar uses ``time.time``)."""
+    with (
+        patch("time.time", return_value=when),
+        patch("app.auth.time.time", return_value=when),
+    ):
+        yield
+
+
+def _relogin_at(authenticated_client: TestClient, when: float) -> None:
+    authenticated_client.post("/logout")
+    with _frozen_time(when):
+        r = authenticated_client.post(
+            "/login",
+            data={"username": TEST_USERNAME, "password": TEST_PASSWORD},
+        )
+    assert r.status_code == 303
+
+
+def test_ensure_app_settings_defaults(test_db: Session):
+    row = ensure_app_settings(test_db)
+    test_db.commit()
+    assert row.session_absolute_minutes == DEFAULT_SESSION_ABSOLUTE_MINUTES
+    assert row.session_idle_minutes == DEFAULT_SESSION_IDLE_MINUTES
+
+
+def test_session_absolute_timeout(authenticated_client: TestClient, test_db: Session):
+    t0 = 1_700_000_000.0
+    _relogin_at(authenticated_client, t0)
+    _set_session_timeouts(test_db, absolute=10, idle=100_000)
+
+    with _frozen_time(t0 + 11 * 60):
+        r = authenticated_client.get("/", follow_redirects=False)
+    assert r.status_code == 303
+    assert "expired" in (r.headers.get("location") or "").lower()
+
+
+def test_session_idle_timeout(authenticated_client: TestClient, test_db: Session):
+    t0 = 1_700_000_000.0
+    _set_session_timeouts(test_db, absolute=100_000, idle=10)
+    _relogin_at(authenticated_client, t0)
+
+    with _frozen_time(t0 + 11 * 60):
+        r = authenticated_client.get("/", follow_redirects=False)
+    assert r.status_code == 303
+    assert "expired" in (r.headers.get("location") or "").lower()
+
+
+def test_session_idle_refresh_extends_session(
+    authenticated_client: TestClient,
+    test_db: Session,
+):
+    t0 = 1_700_000_000.0
+    _set_session_timeouts(test_db, absolute=100_000, idle=60)
+    _relogin_at(authenticated_client, t0)
+
+    with _frozen_time(t0 + 30 * 60):
+        r_mid = authenticated_client.get("/", follow_redirects=False)
+    assert r_mid.status_code == 200
+
+    with _frozen_time(t0 + 95 * 60):
+        r_late = authenticated_client.get("/", follow_redirects=False)
+    assert r_late.status_code == 303
+    assert "expired" in (r_late.headers.get("location") or "").lower()
+
+
+def test_legacy_session_cookie_rejected(
+    authenticated_client: TestClient,
+    test_db: Session,
+):
+    user = test_db.scalars(select(User).where(User.username == TEST_USERNAME)).one()
+    token = _session_serializer().dumps(
+        {"user_id": user.id, "session_version": user.session_version},
+    )
+    authenticated_client.cookies.set("session", token)
+    r = authenticated_client.get("/", follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers.get("location") == "/login"

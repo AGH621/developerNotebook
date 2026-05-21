@@ -7,7 +7,7 @@ import re
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Topic
+from app.models import StarterTopic, Topic
 
 
 def slug_base(name: str) -> str:
@@ -61,6 +61,27 @@ def allocate_topic_slug(
         q = select(Topic.id).where(Topic.user_id == user_id, Topic.slug == candidate)
         if exclude_topic_id is not None:
             q = q.where(Topic.id != exclude_topic_id)
+        clash = session.scalars(q).first()
+        if clash is None:
+            return candidate
+        candidate = f"{base}-{n}"
+        n += 1
+
+
+def allocate_starter_topic_slug(
+    session: Session,
+    topic_name: str,
+    *,
+    exclude_topic_id: int | None = None,
+) -> str:
+    """Return a slug unique among all ``StarterTopic`` rows for ``topic_name``."""
+    base = slug_base(topic_name)
+    candidate = base
+    n = 2
+    while True:
+        q = select(StarterTopic.id).where(StarterTopic.slug == candidate)
+        if exclude_topic_id is not None:
+            q = q.where(StarterTopic.id != exclude_topic_id)
         clash = session.scalars(q).first()
         if clash is None:
             return candidate

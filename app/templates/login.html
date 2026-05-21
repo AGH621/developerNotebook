@@ -3,6 +3,9 @@
 {% block content %}
 <section class="auth-panel">
   <h1>Log in</h1>
+  {% if ok %}
+  <p class="auth-panel__success" role="status">{{ ok }}</p>
+  {% endif %}
   {% if error %}
   <p class="auth-panel__error" role="alert">{{ error }}</p>
   {% endif %}
@@ -18,6 +21,13 @@
     </label>
     <button type="submit" class="auth-form__submit">Log in</button>
   </form>
-  <p class="auth-panel__footer"><a href="/register">Create an account</a> · invitation link required</p>
+  {% if guest_available %}
+  <form method="post" action="/guest-login" class="auth-form auth-form--guest">
+    {% include "partials/csrf_field.html" %}
+    <button type="submit" class="auth-form__submit auth-form__submit--secondary">Browse as guest</button>
+  </form>
+  <p class="auth-panel__hint">Guest access is read-only — browse selected topics and copy commands.</p>
+  {% endif %}
+  <p class="auth-panel__footer"><a href="/register">Create a full account</a> · invitation link required</p>
 </section>
 {% endblock %}
