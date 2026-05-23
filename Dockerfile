@@ -13,9 +13,10 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY app/ app/
 
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser \
-    && mkdir -p /data && chown appuser:appgroup /data
+    && mkdir -p /data && chown appuser:appgroup /data \
+    && chown -R appuser:appgroup /app
 
 USER appuser
 
 EXPOSE 8080
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers"]
+CMD ["/app/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers"]

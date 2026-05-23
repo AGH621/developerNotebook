@@ -7,7 +7,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth import hash_password, verify_password
-from app.bootstrap import bootstrap_admin_from_env, bootstrap_guest_user, run_startup_tasks, seed_starter_catalog_if_empty
+from app.bootstrap import (
+    bootstrap_admin_from_env,
+    bootstrap_guest_user,
+    ensure_missing_starter_topics,
+    run_startup_tasks,
+    seed_starter_catalog_if_empty,
+)
 from app.models import StarterEntry, StarterTopic, User
 
 _MINI_STARTER: list[dict] = [
@@ -113,6 +119,36 @@ def test_seed_starter_catalog_idempotent(test_db: Session):
     again = seed_starter_catalog_if_empty(test_db, _MINI_STARTER)
     assert again is False
     assert len(test_db.scalars(select(StarterTopic)).all()) == 1
+
+
+_SECOND_MINI_STARTER: list[dict] = [
+    {
+        "name": "OtherTopic",
+        "sections": [
+            {
+                "name": "Sec",
+                "entries": [
+                    {"description": "Run", "command": "other --run"},
+                ],
+            },
+        ],
+    },
+]
+
+
+def test_ensure_missing_starter_topics_adds_only_new(test_db: Session):
+    seed_starter_catalog_if_empty(test_db, _MINI_STARTER)
+    test_db.commit()
+    added = ensure_missing_starter_topics(
+        test_db,
+        _MINI_STARTER + _SECOND_MINI_STARTER,
+    )
+    test_db.commit()
+    assert added == 1
+    names = [t.name for t in test_db.scalars(select(StarterTopic).order_by(StarterTopic.display_order)).all()]
+    assert names == ["TinyTopic", "OtherTopic"]
+    again = ensure_missing_starter_topics(test_db, _MINI_STARTER + _SECOND_MINI_STARTER)
+    assert again == 0
 
 
 def test_run_startup_tasks_runs_admin_and_seed(monkeypatch: pytest.MonkeyPatch, test_db: Session):

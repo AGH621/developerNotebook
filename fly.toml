@@ -1,36 +1,41 @@
-app = "developer-memory-garden"
-primary_region = "sjc"
+# fly.toml app configuration file generated for developer-memory-garden on 2026-05-22T19:56:33-07:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'developer-memory-garden'
+primary_region = 'sjc'
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = 'Dockerfile'
 
 [env]
-  APP_ENV = "production"
+  APP_ENV = 'production'
+
+[[mounts]]
+  source = 'notebook_data'
+  destination = '/data'
+  initial_size = '1gb'
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = "off"
+  auto_stop_machines = 'off'
   auto_start_machines = true
   min_machines_running = 1
 
   [http_service.concurrency]
-    type = "requests"
-    soft_limit = 200
+    type = 'requests'
     hard_limit = 250
+    soft_limit = 200
 
   [[http_service.checks]]
-    grace_period = "10s"
-    interval = "30s"
-    method = "GET"
-    timeout = "5s"
-    path = "/"
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '60s'
+    method = 'GET'
+    path = '/health'
 
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "256mb"
-
-[mounts]
-  source = "notebook_data"
-  destination = "/data"
-  initial_size = "1gb"
+  size = 'shared-cpu-1x'
+  memory = '256mb'

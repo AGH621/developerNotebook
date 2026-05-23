@@ -76,25 +76,19 @@ def bootstrap_admin_from_env(db: Session) -> None:
     )
 
 
-def seed_starter_catalog_if_empty(db: Session, topics_blob: list[dict]) -> bool:
-    """If the starter catalog has no topics, insert rows from ``topics_blob``.
-
-    Returns
-    -------
-    bool
-        ``True`` if rows were inserted, ``False`` if the catalog was already
-        populated.
-    """
-    n = db.scalar(select(func.count(StarterTopic.id))) or 0
-    if n > 0:
-        return False
-
-    for t_order, topic_blob in enumerate(topics_blob):
+def _insert_starter_topics_from_blob(
+    db: Session,
+    topics_blob: list[dict],
+    *,
+    display_order_start: int,
+) -> int:
+    """Insert starter catalog rows from ``topics_blob``; return topics inserted."""
+    for offset, topic_blob in enumerate(topics_blob):
         name = str(topic_blob["name"])
         topic = StarterTopic(
             name=name,
             slug=allocate_starter_topic_slug(db, name),
-            display_order=t_order,
+            display_order=display_order_start + offset,
         )
         db.add(topic)
         db.flush()
@@ -122,11 +116,54 @@ def seed_starter_catalog_if_empty(db: Session, topics_blob: list[dict]) -> bool:
                     ),
                 )
 
+    return len(topics_blob)
+
+
+def seed_starter_catalog_if_empty(db: Session, topics_blob: list[dict]) -> bool:
+    """If the starter catalog has no topics, insert rows from ``topics_blob``.
+
+    Returns
+    -------
+    bool
+        ``True`` if rows were inserted, ``False`` if the catalog was already
+        populated.
+    """
+    n = db.scalar(select(func.count(StarterTopic.id))) or 0
+    if n > 0:
+        return False
+
+    _insert_starter_topics_from_blob(db, topics_blob, display_order_start=0)
     logger.info(
         "Starter catalog seeded from bundled data (%s topics).",
         len(topics_blob),
     )
     return True
+
+
+def ensure_missing_starter_topics(db: Session, topics_blob: list[dict]) -> int:
+    """Add bundled topics that are not yet present in the starter catalog."""
+    existing_names = {
+        str(name).casefold()
+        for name in db.scalars(select(StarterTopic.name)).all()
+    }
+    missing = [
+        topic_blob
+        for topic_blob in topics_blob
+        if str(topic_blob["name"]).casefold() not in existing_names
+    ]
+    if not missing:
+        return 0
+
+    next_order = int(
+        db.scalar(select(func.coalesce(func.max(StarterTopic.display_order), -1))) or -1,
+    )
+    added = _insert_starter_topics_from_blob(
+        db,
+        missing,
+        display_order_start=next_order + 1,
+    )
+    logger.info("Starter catalog: added %s missing bundled topics.", added)
+    return added
 
 
 def ensure_starter_topic_slugs(db: Session) -> None:
@@ -178,6 +215,8 @@ def run_startup_tasks(db: Session, *, starter_data: list[dict] | None = None) ->
     """Run admin bootstrap then optional starter-catalog seed."""
     ensure_app_settings(db)
     bootstrap_admin_from_env(db)
-    seed_starter_catalog_if_empty(db, starter_data if starter_data is not None else STARTER_DATA)
+    blob = starter_data if starter_data is not None else STARTER_DATA
+    seed_starter_catalog_if_empty(db, blob)
+    ensure_missing_starter_topics(db, blob)
     ensure_starter_topic_slugs(db)
     bootstrap_guest_user(db)

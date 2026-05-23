@@ -51,7 +51,7 @@ Restart the app. Log in at `/login`, then open `/admin` to create invitation lin
 |----------|---------|---------|
 | `DATABASE_URL` | `sqlite:///…/notebook.db` | SQLAlchemy database URL |
 | `SECRET_KEY` | insecure dev default | Signs session cookies; **required** when `APP_ENV=production` |
-| `APP_ENV` | `dev` | Set to `production` to enable HTTPS redirect, HSTS, and hide OpenAPI docs |
+| `APP_ENV` | `dev` | Set to `production` to enable HSTS, stricter headers, and hide OpenAPI docs |
 | `SECURE_COOKIES` | off | Set to `true` when serving over HTTPS |
 | `ALLOWED_HOSTS` | (none) | Comma-separated hostnames for `TrustedHostMiddleware` |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | (none) | Bootstrap or promote an admin on startup |

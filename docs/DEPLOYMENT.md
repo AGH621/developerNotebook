@@ -14,6 +14,14 @@ Developer Memory Garden deploys as a Docker container on [Fly.io](https://fly.io
 
 Configuration files: `Dockerfile`, `fly.toml`.
 
+### How the container runs
+
+The image installs dependencies at **build time** with `uv sync` (see `Dockerfile`). At runtime it starts uvicorn from the project virtualenv (`.venv/bin/uvicorn`), not `uv run`. That avoids `uv` trying to write a cache under the system user’s home directory (`/nonexistent`), which crashes the container on Fly.
+
+The app runs as non-root user `appuser`. Fly mounts the volume at `/data` with uid/gid matching that user.
+
+Fly’s HTTP health check calls `GET /health`, which returns **200** and bypasses `TrustedHostMiddleware` so internal probes (which use hosts like `127.0.0.1:8080`) do not fail. HTTPS is enforced at the Fly edge (`force_https = true` in `fly.toml`), not in the app — the container sees plain HTTP from Fly’s proxy, so an in-app HTTPS redirect would loop. User traffic still uses `ALLOWED_HOSTS` when that secret is set.
+
 ---
 
 ## Prerequisites
@@ -152,7 +160,9 @@ fly status
 fly checks list
 ```
 
-Open `https://developer-memory-garden.fly.dev/login` (or your app hostname). The health check in `fly.toml` hits `GET /`, which redirects unauthenticated users to login — that is expected.
+Open `https://developer-memory-garden.fly.dev/login` (or your app hostname).
+
+In logs you should see uvicorn listening on port `8080` and messages such as `Database tables ensured`. `fly checks list` should show `servicecheck-00-http-8080` passing against `/health`.
 
 ---
 
@@ -286,11 +296,44 @@ sqlite:////data/notebook.db
 
 ### 400 Bad Request / invalid host
 
-Set `ALLOWED_HOSTS` to include the hostname you are using in the browser.
+Set `ALLOWED_HOSTS` to include the hostname you are using in the browser (hostname only — no `https://` or port). This does not affect `GET /health`, which Fly uses for health checks.
+
+Example:
+
+```bash
+fly secrets set ALLOWED_HOSTS='developer-memory-garden.fly.dev'
+```
+
+### App crashes on startup: `Failed to initialize cache at /nonexistent/.cache/uv`
+
+The container was started with `uv run` while running as the system user `appuser`, whose home directory is `/nonexistent`. `uv` cannot create its cache there and exits immediately (code 2), often after `machine has reached its max restart count of 10`.
+
+The current `Dockerfile` runs `/app/.venv/bin/uvicorn` directly instead. Redeploy after pulling that change:
+
+```bash
+fly deploy
+```
 
 ### Health check failing
 
-Check logs: `fly logs`. Common causes: missing secrets, volume not mounted, or app not listening on `8080`.
+Check logs: `fly logs`. The check path is `GET /health` in `fly.toml` (not `/`).
+
+| Log pattern | Likely cause |
+|-------------|----------------|
+| `SECRET_KEY must be set` | Missing `SECRET_KEY` secret |
+| `Failed to initialize cache at /nonexistent/.cache/uv` | Old image still using `uv run`; redeploy with current `Dockerfile` |
+| `unable to open database file` | Volume missing or wrong `DATABASE_URL` |
+| Continuous `GET /` **400** `Invalid host header` | Browser traffic blocked by `ALLOWED_HOSTS`; fix the secret (see above). Health checks should use `/health`. |
+| Uvicorn starts, `/health` not **200** | Redeploy with current app code and `fly.toml` |
+| `Main child exited` with no app logs | Process crash before bind; see rows above |
+
+If the machine never stays running, `fly checks list` may show **“the machine hasn’t started”** — fix startup first (secrets, volume, Dockerfile), not the check path.
+
+If first boot is slow on a small VM, increase `grace_period` under `[[http_service.checks]]` in `fly.toml`.
+
+### Browser: `ERR_TOO_MANY_REDIRECTS`
+
+Fly already redirects HTTP to HTTPS (`force_https` in `fly.toml`). Do **not** add Starlette `HTTPSRedirectMiddleware` in the app on Fly — the proxy connects over HTTP internally, so the app would redirect to HTTPS on every request and the browser would loop forever. Production uses HSTS response headers only; TLS termination stays at the edge.
 
 ### SSH / backup fails
 
@@ -302,7 +345,7 @@ Confirm the app is running (`fly status`), you are logged in (`fly auth whoami`)
 
 When `APP_ENV=production`, the app enables:
 
-- HTTPS redirect and HSTS
+- HSTS (HTTPS is enforced by Fly’s edge, not an in-app redirect)
 - Security headers (CSP, `X-Frame-Options`, etc.)
 - OpenAPI docs disabled (`/docs`, `/redoc`)
 - Session secret enforcement

@@ -12,7 +12,6 @@ from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -29,6 +28,21 @@ logging.basicConfig(
 logger = logging.getLogger("devnotebook")
 
 _APP_DIR = Path(__file__).resolve().parent
+_HEALTH_PATHS = frozenset({"/health"})
+
+
+class _ConditionalTrustedHostMiddleware:
+    """Trusted host validation, except Fly internal probes to ``/health``."""
+
+    def __init__(self, app, *, allowed_hosts: list[str]):
+        self.app = app
+        self._trusted = TrustedHostMiddleware(app, allowed_hosts=allowed_hosts)
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope["path"] in _HEALTH_PATHS:
+            await self.app(scope, receive, send)
+            return
+        await self._trusted(scope, receive, send)
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -109,6 +123,10 @@ def create_app(*, enable_lifespan: bool = True) -> FastAPI:
 
     application = FastAPI(**fastapi_kwargs)
 
+    @application.get("/health", include_in_schema=False)
+    async def health_check() -> PlainTextResponse:
+        return PlainTextResponse("ok")
+
     from app.auth import SESSION_COOKIE_NAME, resolve_session_secret, session_cookie_secure
     from app.csrf import CookieFormCSRFMiddleware
     from app.rate_limit import limiter
@@ -138,13 +156,14 @@ def create_app(*, enable_lifespan: bool = True) -> FastAPI:
         cookie_httponly=False,
     )
     application.add_middleware(SecurityHeadersMiddleware, is_production=is_production)
-    if is_production:
-        application.add_middleware(HTTPSRedirectMiddleware)
     allowed_raw = os.environ.get("ALLOWED_HOSTS", "").strip()
     if allowed_raw:
         allowed_hosts = [h.strip() for h in allowed_raw.split(",") if h.strip()]
         if allowed_hosts:
-            application.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
+            application.add_middleware(
+                _ConditionalTrustedHostMiddleware,
+                allowed_hosts=allowed_hosts,
+            )
     elif is_production:
         logger.warning(
             "ALLOWED_HOSTS is not set in production. Set it to your domain(s) "

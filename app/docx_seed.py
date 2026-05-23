@@ -164,3 +164,8 @@ def parse_developer_commands_docx(docx_path: Path | None = None) -> list[dict]:
         )
 
     return [t for t in topics_out if t.get("sections")]
+
+
+def docx_to_starter_data(docx_path: Path | None = None) -> list[dict]:
+    """Parse the Word cheatsheet into the bundled starter-data shape."""
+    return parse_developer_commands_docx(docx_path)
