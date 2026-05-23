@@ -1,0 +1,13 @@
+.git/
+.gitignore
+.env
+.venv/
+__pycache__/
+*.py[oc]
+*.db
+*.sqlite
+tests/
+cursor_chats/
+.cursorignore
+.DS_Store
+fly.toml

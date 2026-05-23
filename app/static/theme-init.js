@@ -1,5 +1,5 @@
 (function () {
-  var STORAGE_KEY = "developer-notebook-theme";
+  var STORAGE_KEY = "developer-memory-garden-theme";
   try {
     var stored = localStorage.getItem(STORAGE_KEY);
     if (stored === "light" || stored === "dark") {

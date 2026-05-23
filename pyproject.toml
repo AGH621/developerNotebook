@@ -1,5 +1,5 @@
 [project]
-name = "developer-notebook"
+name = "developer-memory-garden"
 version = "0.1.0"
 description = "Make my collection of programming commands available everywhere."
 readme = "README.md"

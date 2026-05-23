@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Developer Notebook{% endblock %}</title>
+  <title>{% block title %}Developer Memory Garden{% endblock %}</title>
   <script src="/static/theme-init.js"></script>
   <link rel="stylesheet" href="/static/styles.css">
   <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
@@ -14,7 +14,7 @@
 <body>
 {% include "partials/topic_menu_sprite.html" %}
   <nav class="site-nav">
-    <a href="/" class="site-nav__brand">Developer Notebook</a>
+    <a href="/" class="site-nav__brand">Developer Memory Garden</a>
     {% if user %}
     <div class="site-nav__search-slot">
       <form class="site-nav__search" action="/search" method="get">

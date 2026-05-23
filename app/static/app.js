@@ -19,7 +19,7 @@ document.body.addEventListener("htmx:afterRequest", function (evt) {
 
 /* Theme toggle. */
 (function () {
-  var STORAGE_KEY = "developer-notebook-theme";
+  var STORAGE_KEY = "developer-memory-garden-theme";
   var toggle = document.getElementById("theme-toggle");
   if (!toggle) return;
 

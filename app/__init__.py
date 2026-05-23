@@ -1,5 +1,5 @@
 def main():
-    print("Hello from dev-notebook!")
+    print("Hello from developer-memory-garden!")
 
 
 if __name__ == "__main__":
