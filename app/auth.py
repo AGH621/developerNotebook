@@ -54,8 +54,16 @@ def resolve_session_secret() -> str:
 
 
 def session_cookie_secure() -> bool:
-    """Whether session (and CSRF) cookies should use the ``Secure`` flag."""
-    return os.environ.get("SECURE_COOKIES", "").strip().lower() in ("1", "true", "yes")
+    """Whether session (and CSRF) cookies should use the ``Secure`` flag.
+
+    Defaults to ``True`` in production (APP_ENV=production) unless explicitly
+    disabled. In dev mode, defaults to ``False``.
+    """
+    raw = os.environ.get("SECURE_COOKIES", "").strip().lower()
+    if raw:
+        return raw in ("1", "true", "yes")
+    is_production = os.environ.get("APP_ENV", "dev").strip().lower() == "production"
+    return is_production
 
 
 @lru_cache(maxsize=1)

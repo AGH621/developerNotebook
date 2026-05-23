@@ -14,6 +14,7 @@ from app.database import get_db
 from app.indexing import fts_delete, fts_insert, fts_update
 from app.models import Entry, Section, Topic, User
 from app.templating import templates
+from app.validation import MAX_ENTRY_COMMAND, MAX_ENTRY_DESCRIPTION, truncate
 
 router = APIRouter()
 entries_log = logging.getLogger("devnotebook.routes.entries")
@@ -79,8 +80,8 @@ async def create_entry(
         )
         return Response(status_code=404)
 
-    desc = (description or "").strip()
-    cmd = (command or "").strip()
+    desc = truncate(description, MAX_ENTRY_DESCRIPTION)
+    cmd = truncate(command, MAX_ENTRY_COMMAND)
     next_ord = db.scalar(
         select(func.coalesce(func.max(Entry.display_order), -1)).where(
             Entry.section_id == section_id,
@@ -295,8 +296,8 @@ async def update_entry(
 
     old_desc = entry.description
     old_cmd = entry.command
-    new_desc = (description or "").strip()
-    new_cmd = (command or "").strip()
+    new_desc = truncate(description, MAX_ENTRY_DESCRIPTION)
+    new_cmd = truncate(command, MAX_ENTRY_COMMAND)
     entry.description = new_desc
     entry.command = new_cmd
     fts_update(db, entry.id, old_desc, old_cmd, new_desc, new_cmd)

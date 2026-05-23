@@ -47,7 +47,12 @@ def bootstrap_admin_from_env(db: Session) -> None:
     if existing is None:
         pw_issue = validate_password(password)
         if pw_issue:
-            logger.warning("Bootstrap admin: %s", pw_issue)
+            logger.error(
+                "Bootstrap admin NOT created: %s "
+                "Set a stronger ADMIN_PASSWORD and redeploy.",
+                pw_issue,
+            )
+            return
         db.add(
             User(
                 username=username,

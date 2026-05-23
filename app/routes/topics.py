@@ -14,6 +14,7 @@ from app.database import get_db
 from app.models import Section, Topic, User
 from app.slug import allocate_topic_slug
 from app.templating import templates
+from app.validation import MAX_TOPIC_NAME, truncate
 
 router = APIRouter()
 topics_log = logging.getLogger("devnotebook.routes.topics")
@@ -59,7 +60,7 @@ async def create_topic(
     TemplateResponse
         Renders ``partials/topic_card.html`` for the new topic (HTMX target).
     """
-    label = (name or "").strip() or "New topic"
+    label = truncate(name, MAX_TOPIC_NAME) or "New topic"
     next_ord = db.scalar(
         select(func.coalesce(func.max(Topic.display_order), -1)).where(Topic.user_id == user.id),
     )
@@ -258,7 +259,7 @@ async def rename_topic(
             user.id,
         )
         return Response(status_code=404)
-    label = name.strip()
+    label = truncate(name, MAX_TOPIC_NAME)
     if not label:
         label = "Untitled topic"
     topic.name = label

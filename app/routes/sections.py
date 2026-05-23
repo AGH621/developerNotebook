@@ -14,6 +14,7 @@ from app.database import get_db
 from app.models import Section, Topic, User
 from app.routes.topics import _topic_owned, _topic_with_sections
 from app.templating import templates
+from app.validation import MAX_SECTION_NAME, MAX_SECTION_NOTES, truncate
 
 router = APIRouter()
 sections_log = logging.getLogger("devnotebook.routes.sections")
@@ -121,7 +122,7 @@ async def create_section(
         )
         return Response(status_code=404)
 
-    label = (name or "").strip() or "New section"
+    label = truncate(name, MAX_SECTION_NAME) or "New section"
     next_ord = db.scalar(
         select(func.coalesce(func.max(Section.display_order), -1)).where(
             Section.topic_id == topic_id,
@@ -341,9 +342,9 @@ async def update_section(
         )
         return Response(status_code=404)
 
-    label = (name or "").strip()
+    label = truncate(name, MAX_SECTION_NAME)
     section.name = label or None
-    n = (notes or "").strip()
+    n = truncate(notes, MAX_SECTION_NOTES)
     section.notes = n or None
     db.commit()
 

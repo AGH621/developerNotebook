@@ -9,7 +9,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 from starlette.responses import Response
@@ -28,6 +28,7 @@ from app.auth import (
 from app.database import get_db
 from app.rate_limit import limiter
 from app.models import Invitation, Section, Topic, User
+from app.validation import MAX_USERNAME, truncate
 from app.routes.sections import _topic_context_flags
 from app.services.guest import guest_topic_by_slug, guest_visible_topics, sorted_starter_sections
 from app.services.seed import (
@@ -466,7 +467,7 @@ async def register_post(
             status_code=status_cd,
         )
 
-    name = username.strip()
+    name = truncate(username, MAX_USERNAME)
     code_value = (invite_code or "").strip()
     if not name or not password:
         auth_log.warning("Registration rejected empty username or password")
@@ -502,8 +503,18 @@ async def register_post(
             status_cd=status.HTTP_409_CONFLICT,
         )
 
-    invitation.used_by = user.id
-    invitation.used_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    rows_claimed = db.execute(
+        update(Invitation)
+        .where(Invitation.id == invitation.id, Invitation.used_by.is_(None))
+        .values(used_by=user.id, used_at=datetime.now(timezone.utc).replace(tzinfo=None)),
+    ).rowcount
+    if not rows_claimed:
+        db.rollback()
+        auth_log.warning("Registration rejected invite race code=%s", code_value)
+        return _invite_error_response(
+            "This invitation is invalid or has already been used.",
+            status_cd=status.HTTP_409_CONFLICT,
+        )
     db.commit()
 
     db.refresh(user)
@@ -738,12 +749,15 @@ async def change_password_post(
         )
 
     user.password_hash = hash_password(new_password)
+    user.session_version += 1
     db.commit()
     auth_log.info("Password changed user_id=%s", user.id)
-    return RedirectResponse(
+    response = RedirectResponse(
         url="/change-password?ok=1",
         status_code=status.HTTP_303_SEE_OTHER,
     )
+    create_session(response, user, db)
+    return response
 
 
 @router.get("/delete-account")

@@ -145,6 +145,11 @@ def create_app(*, enable_lifespan: bool = True) -> FastAPI:
         allowed_hosts = [h.strip() for h in allowed_raw.split(",") if h.strip()]
         if allowed_hosts:
             application.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
+    elif is_production:
+        logger.warning(
+            "ALLOWED_HOSTS is not set in production. Set it to your domain(s) "
+            "to prevent Host header attacks (e.g. ALLOWED_HOSTS=myapp.fly.dev).",
+        )
     return application
 
 
