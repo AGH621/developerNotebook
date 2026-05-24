@@ -12,6 +12,10 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 COPY app/ app/
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends sqlite3 \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser \
     && mkdir -p /data && chown appuser:appgroup /data \
     && chown -R appuser:appgroup /app

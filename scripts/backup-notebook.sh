@@ -13,6 +13,7 @@ LOCAL_DB="$DROPBOX/Python/projects/developerNotebook/notebook.db"
 DEV_BACKUP_DIR="$DROPBOX/_backups/dev"
 PROD_BACKUP_DIR="$DROPBOX/_backups/prod"
 
+# FLY_APP="${FLY_APP:-developer-memory-garden}"
 FLY_APP="${FLY_APP:-developer-memory-garden}"
 REMOTE_DB="/data/notebook.db"
 RETENTION_DAYS=14
@@ -58,10 +59,10 @@ backup_fly() {
   fi
 
   local tmp
-  tmp="$(mktemp /tmp/notebook-fly-XXXX.db)"
+  tmp="$(mktemp -u /tmp/notebook-fly-XXXXXX)"
   trap 'rm -f "$tmp"' RETURN
 
-  if ! fly ssh console -a "$FLY_APP" -C "sqlite3 '$REMOTE_DB' \".backup '/tmp/notebook-backup.db\"'" 2>>"$PROD_BACKUP_DIR/backup.log"; then
+  if ! fly ssh console -a "$FLY_APP" -C "sqlite3 $REMOTE_DB \".backup '/tmp/notebook-backup.db'\"" 2>>"$PROD_BACKUP_DIR/backup.log"; then
     log "$PROD_BACKUP_DIR" "SKIP fly ssh console failed (app unreachable?)"
     return
   fi
