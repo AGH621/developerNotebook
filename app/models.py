@@ -187,6 +187,33 @@ class Invitation(Base):
     redeemed_by_user: Mapped[User | None] = relationship(foreign_keys=[used_by])
 
 
+class InvitationRequest(Base):
+    """Visitor request for a closed-registration invite."""
+
+    __tablename__ = "invitation_requests"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(String(254), index=True)
+    name: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    reviewed_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    invitation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("invitations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    reviewer: Mapped[User | None] = relationship(foreign_keys=[reviewed_by])
+    invitation: Mapped[Invitation | None] = relationship(foreign_keys=[invitation_id])
+
+
 class StarterTopic(Base):
     """Global template topic for onboarding (not tied to a user)."""
 

@@ -11,6 +11,7 @@ from app.auth import hash_password
 from app.models import (
     Entry,
     Invitation,
+    InvitationRequest,
     Section,
     StarterEntry,
     StarterSection,
@@ -144,6 +145,30 @@ def test_invitation_created_and_redeemed_by_users(test_db: Session):
     assert row.creator.username == "inviter"
     assert row.redeemed_by_user is not None
     assert row.redeemed_by_user.username == "joiner"
+
+
+def test_invitation_request_approved_links_invitation(test_db: Session):
+    admin = User(username="reviewer", password_hash=hash_password("a"), is_admin=True)
+    test_db.add(admin)
+    test_db.flush()
+    inv = Invitation(code="req-invite-token", created_by=admin.id)
+    test_db.add(inv)
+    test_db.flush()
+    req = InvitationRequest(
+        email="alice@example.com",
+        name="Alice",
+        status="approved",
+        reviewed_by=admin.id,
+        invitation_id=inv.id,
+    )
+    test_db.add(req)
+    test_db.commit()
+
+    row = test_db.scalars(select(InvitationRequest).where(InvitationRequest.id == req.id)).one()
+    assert row.reviewer is not None
+    assert row.reviewer.username == "reviewer"
+    assert row.invitation is not None
+    assert row.invitation.code == "req-invite-token"
 
 
 def test_cascade_delete_starter_topic_removes_sections_and_entries(test_db: Session):

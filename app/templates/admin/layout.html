@@ -4,6 +4,9 @@
 <nav class="admin-tabs" aria-label="Admin sections">
   <a href="/admin" class="admin-tabs__link {% block admin_nav_users %}{% endblock %}">Users</a>
   <a href="/admin/invites" class="admin-tabs__link {% block admin_nav_invites %}{% endblock %}">Invitations</a>
+  <a href="/admin/invite-requests" class="admin-tabs__link {% block admin_nav_requests %}{% endblock %}">
+    Requests{% if pending_count %} ({{ pending_count }}){% endif %}
+  </a>
   <a href="/admin/starter" class="admin-tabs__link {% block admin_nav_starter %}{% endblock %}">Starter catalog</a>
 </nav>
 

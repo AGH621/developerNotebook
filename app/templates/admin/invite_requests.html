@@ -1,0 +1,48 @@
+{% extends "admin/layout.html" %}
+{% block title %}Admin — Invitation requests{% endblock %}
+{% block admin_nav_requests %}admin-tabs__link--active{% endblock %}
+{% block admin_body %}
+<h1 class="admin-heading">Invitation requests</h1>
+<p class="admin-lede">Review visitor requests. Approving creates a single-use signup link to send manually.</p>
+
+{% if approved_email and new_invite_link %}
+<p class="admin-flash admin-flash--ok" role="status">
+  Approved request from <strong>{{ approved_email }}</strong>.
+</p>
+<p>Send this link to them:</p>
+<div class="admin-invite-link">
+  <code>{{ new_invite_link }}</code>
+  {% with copy_text=new_invite_link %}
+  {% include "admin/partials/copy_link_button.html" %}
+  {% endwith %}
+</div>
+{% endif %}
+{% if ok_message %}
+<p class="admin-flash admin-flash--ok" role="status">{{ ok_message }}</p>
+{% endif %}
+{% if error %}
+<p class="admin-flash admin-flash--err" role="alert">{{ error }}</p>
+{% endif %}
+
+<div class="admin-table-scroll">
+<table class="admin-table">
+  <thead>
+    <tr>
+      <th scope="col">Email</th>
+      <th scope="col">Name</th>
+      <th scope="col">Message</th>
+      <th scope="col">Submitted</th>
+      <th scope="col">Status</th>
+      <th scope="col">Actions</th>
+    </tr>
+  </thead>
+  <tbody id="admin-invite-request-rows">
+    {% for req in invite_requests %}
+    {% include "admin/partials/invite_request_row.html" %}
+    {% else %}
+    <tr><td colspan="6" class="admin-muted admin-table__empty">No invitation requests yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

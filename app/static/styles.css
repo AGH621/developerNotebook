@@ -648,6 +648,43 @@ a:focus-visible {
   box-shadow: var(--input-focus-ring);
 }
 
+.auth-form__field textarea {
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  background: var(--color-surface);
+  resize: vertical;
+  min-height: 4.5rem;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.auth-form__field textarea:hover {
+  border-color: var(--color-border-strong);
+}
+
+.auth-form__field textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: var(--input-focus-ring);
+}
+
+.auth-form__optional {
+  font-weight: 400;
+  color: var(--color-muted);
+}
+
+.auth-form__hp {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
 .auth-form__submit {
   margin-top: var(--space-1);
   padding: 0.6rem 1rem;

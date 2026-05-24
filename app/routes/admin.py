@@ -10,13 +10,15 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import RedirectResponse, Response
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth import hash_password, require_admin, validate_password
 from app.database import get_db
+from app.invite_requests import STATUS_APPROVED, STATUS_PENDING, STATUS_REJECTED
 from app.models import (
     Invitation,
+    InvitationRequest,
     StarterEntry,
     StarterSection,
     StarterTopic,
@@ -354,6 +356,130 @@ async def admin_invites_revoke(
     return RedirectResponse(
         url="/admin/invites?ok="
         + quote("Invitation revoked."),
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+def _pending_invite_request_count(db: Session) -> int:
+    return int(
+        db.scalar(
+            select(func.count(InvitationRequest.id)).where(
+                InvitationRequest.status == STATUS_PENDING,
+            ),
+        )
+        or 0,
+    )
+
+
+@router.get("/invite-requests", include_in_schema=False)
+async def admin_invite_requests(
+    request: Request,
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(require_admin),
+):
+    """List visitor invitation requests for review."""
+    requests = db.scalars(
+        select(InvitationRequest)
+        .options(selectinload(InvitationRequest.invitation))
+        .order_by(
+            case((InvitationRequest.status == STATUS_PENDING, 0), else_=1),
+            InvitationRequest.created_at.desc(),
+        ),
+    ).all()
+    qp_error = request.query_params.get("error")
+    qp_ok = request.query_params.get("ok")
+    approved_id_raw = request.query_params.get("approved")
+    created_code = request.query_params.get("created")
+    approved_email: str | None = None
+    new_link: str | None = None
+    if approved_id_raw and approved_id_raw.strip().isdigit():
+        approved_row = db.get(InvitationRequest, int(approved_id_raw))
+        if approved_row is not None:
+            approved_email = approved_row.email
+    if created_code and created_code.strip():
+        new_link = invite_register_url(request, created_code.strip())
+    return templates.TemplateResponse(
+        request,
+        "admin/invite_requests.html",
+        {
+            "user": admin_user,
+            "invite_requests": requests,
+            "pending_count": _pending_invite_request_count(db),
+            "error": qp_error,
+            "ok_message": qp_ok,
+            "approved_email": approved_email,
+            "new_invite_link": new_link,
+        },
+    )
+
+
+@router.post("/invite-requests/{request_id}/approve", include_in_schema=False)
+async def admin_invite_requests_approve(
+    request_id: int,
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(require_admin),
+):
+    """Approve a pending request and mint a single-use invitation."""
+    req = db.get(InvitationRequest, request_id)
+    if req is None:
+        raise HTTPException(status_code=404, detail="Invitation request not found")
+
+    if req.status != STATUS_PENDING:
+        return RedirectResponse(
+            url="/admin/invite-requests?error="
+            + quote("That request has already been reviewed."),
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    code = _unique_invite_code(db)
+    inv = Invitation(code=code, created_by=admin_user.id)
+    db.add(inv)
+    db.flush()
+    req.status = STATUS_APPROVED
+    req.reviewed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    req.reviewed_by = admin_user.id
+    req.invitation_id = inv.id
+    db.commit()
+    admin_log.info(
+        "admin=%s approved invite request id=%s invitation_id=%s",
+        admin_user.id,
+        request_id,
+        inv.id,
+    )
+    return RedirectResponse(
+        url="/admin/invite-requests?approved="
+        + quote(str(request_id), safe="")
+        + "&created="
+        + quote(code, safe=""),
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/invite-requests/{request_id}/reject", include_in_schema=False)
+async def admin_invite_requests_reject(
+    request_id: int,
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(require_admin),
+):
+    """Reject a pending invitation request."""
+    req = db.get(InvitationRequest, request_id)
+    if req is None:
+        raise HTTPException(status_code=404, detail="Invitation request not found")
+
+    if req.status != STATUS_PENDING:
+        return RedirectResponse(
+            url="/admin/invite-requests?error="
+            + quote("That request has already been reviewed."),
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    req.status = STATUS_REJECTED
+    req.reviewed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    req.reviewed_by = admin_user.id
+    db.commit()
+    admin_log.info("admin=%s rejected invite request id=%s", admin_user.id, request_id)
+    return RedirectResponse(
+        url="/admin/invite-requests?ok=" + quote("Request rejected."),
         status_code=status.HTTP_303_SEE_OTHER,
     )
 

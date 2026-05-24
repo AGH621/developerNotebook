@@ -1,0 +1,53 @@
+<tr id="admin-invite-request-{{ req.id }}" class="admin-invite-request-row">
+  <td>{{ req.email }}</td>
+  <td>{% if req.name %}{{ req.name }}{% else %}<span class="admin-muted">—</span>{% endif %}</td>
+  <td class="admin-invite-request-message">
+    {% if req.message %}
+    <span title="{{ req.message }}">
+      {% if req.message|length > 80 %}{{ req.message[:80] }}…{% else %}{{ req.message }}{% endif %}
+    </span>
+    {% else %}
+    <span class="admin-muted">—</span>
+    {% endif %}
+  </td>
+  <td>{{ req.created_at.strftime("%Y-%m-%d %H:%M") if req.created_at else "—" }}</td>
+  <td>
+    {% if req.status == "pending" %}
+    <span class="admin-badge admin-badge--pending">Pending</span>
+    {% elif req.status == "approved" %}
+    <span class="admin-badge admin-badge--ok">Approved</span>
+    {% else %}
+    <span class="admin-muted">Rejected</span>
+    {% endif %}
+  </td>
+  <td>
+    {% if req.status == "pending" %}
+    <div class="admin-actions">
+      <form method="post" action="/admin/invite-requests/{{ req.id }}/approve" class="admin-inline-form">
+        {% include "partials/csrf_field.html" %}
+        <button type="submit" class="admin-btn admin-btn--primary">Approve</button>
+      </form>
+      <form method="post" action="/admin/invite-requests/{{ req.id }}/reject" class="admin-inline-form"
+            data-confirm="Reject this invitation request?" data-confirm-ok="Reject">
+        {% include "partials/csrf_field.html" %}
+        <button type="submit" class="admin-btn admin-btn--secondary">Reject</button>
+      </form>
+    </div>
+    {% elif req.status == "approved" and req.invitation %}
+    <div class="admin-invite-url__inner">
+      {% set invite_url = invite_register_url(request, req.invitation.code) %}
+      <code>{{ invite_url }}</code>
+      {% with copy_text=invite_url %}
+      {% include "admin/partials/copy_link_button.html" %}
+      {% endwith %}
+      {% if req.invitation.used_by %}
+      <span class="admin-muted"> · Used</span>
+      {% else %}
+      <span class="admin-muted"> · Unused</span>
+      {% endif %}
+    </div>
+    {% else %}
+    <span class="admin-muted">—</span>
+    {% endif %}
+  </td>
+</tr>

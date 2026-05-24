@@ -26,8 +26,14 @@ from app.auth import (
     verify_password,
 )
 from app.database import get_db
+from app.invite_requests import (
+    STATUS_PENDING,
+    normalize_email,
+    normalize_optional_text,
+    validate_request_email,
+)
 from app.rate_limit import limiter
-from app.models import Invitation, Section, Topic, User
+from app.models import Invitation, InvitationRequest, Section, Topic, User
 from app.validation import MAX_USERNAME, truncate
 from app.routes.sections import _topic_context_flags
 from app.services.guest import guest_topic_by_slug, guest_visible_topics, sorted_starter_sections
@@ -359,6 +365,116 @@ async def guest_login_post(
     response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
     create_session(response, guest, db)
     return response
+
+
+def _request_invite_nav_user(request: Request, db: Session) -> User | None:
+    user = get_current_user(request, db)
+    if user is not None and user.is_guest:
+        return user
+    return None
+
+
+def _request_invite_template_ctx(
+    *,
+    user: User | None,
+    error: str | None = None,
+    success: str | None = None,
+) -> dict[str, object]:
+    return {
+        "user": user,
+        "error": error,
+        "success": success,
+        "show_form": success is None,
+    }
+
+
+@router.get("/request-invite")
+async def request_invite_get(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Show the invitation request form."""
+    user = get_current_user(request, db)
+    if user is not None and not user.is_guest:
+        return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+    return templates.TemplateResponse(
+        request,
+        "request_invite.html",
+        _request_invite_template_ctx(user=_request_invite_nav_user(request, db)),
+    )
+
+
+@router.post("/request-invite")
+@limiter.limit("3/minute")
+async def request_invite_post(
+    request: Request,
+    email: Annotated[str, Form()],
+    name: Annotated[str, Form()] = "",
+    message: Annotated[str, Form()] = "",
+    website: Annotated[str, Form()] = "",
+    db: Session = Depends(get_db),
+):
+    """Accept a visitor invitation request for admin review."""
+    nav_user = _request_invite_nav_user(request, db)
+    ctx = _request_invite_template_ctx(user=nav_user)
+
+    if website.strip():
+        return templates.TemplateResponse(
+            request,
+            "request_invite.html",
+            _request_invite_template_ctx(
+                user=nav_user,
+                success="Thanks — we'll review your request and contact you if approved.",
+            ),
+        )
+
+    normalized_email = normalize_email(email)
+    email_err = validate_request_email(normalized_email)
+    if email_err:
+        return templates.TemplateResponse(
+            request,
+            "request_invite.html",
+            {**ctx, "error": email_err},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    existing = db.scalars(
+        select(InvitationRequest.id).where(
+            InvitationRequest.email == normalized_email,
+            InvitationRequest.status == STATUS_PENDING,
+        ),
+    ).first()
+    if existing is not None:
+        return templates.TemplateResponse(
+            request,
+            "request_invite.html",
+            {
+                **ctx,
+                "error": "You already have a pending request for that email address.",
+            },
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    req = InvitationRequest(
+        email=normalized_email,
+        name=normalize_optional_text(name, 150),
+        message=normalize_optional_text(message, 2000),
+        status=STATUS_PENDING,
+    )
+    db.add(req)
+    db.commit()
+
+    return templates.TemplateResponse(
+        request,
+        "request_invite.html",
+        _request_invite_template_ctx(
+            user=nav_user,
+            success=(
+                f"Thanks — we'll review your request and contact you at "
+                f"{normalized_email} if approved."
+            ),
+        ),
+    )
 
 
 @router.get("/register")

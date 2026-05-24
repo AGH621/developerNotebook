@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Request an invitation — Developer Memory Garden{% endblock %}
+{% block content %}
+<section class="auth-panel">
+  <h1>Request an invitation</h1>
+  <p class="auth-panel__lede">
+    Full accounts are invitation-only. Tell us a bit about yourself and we’ll review your request.
+  </p>
+  {% if success %}
+  <p class="auth-panel__success" role="status">{{ success }}</p>
+  {% endif %}
+  {% if error %}
+  <p class="auth-panel__error" role="alert">{{ error }}</p>
+  {% endif %}
+  {% if show_form %}
+  <form method="post" action="/request-invite" class="auth-form">
+    {% include "partials/csrf_field.html" %}
+    <input type="text" name="website" tabindex="-1" autocomplete="off"
+           aria-hidden="true" class="auth-form__hp">
+    <label class="auth-form__field">
+      <span>Email</span>
+      <input name="email" type="email" required autocomplete="email" maxlength="254">
+    </label>
+    <label class="auth-form__field">
+      <span>Name <span class="auth-form__optional">(optional)</span></span>
+      <input name="name" type="text" autocomplete="name" maxlength="150">
+    </label>
+    <label class="auth-form__field">
+      <span>Why do you want access? <span class="auth-form__optional">(optional)</span></span>
+      <textarea name="message" rows="3" maxlength="2000"></textarea>
+    </label>
+    <button type="submit" class="auth-form__submit">Submit request</button>
+  </form>
+  {% endif %}
+  <p class="auth-panel__footer"><a href="/login">Back to log in</a></p>
+</section>
+{% endblock %}
