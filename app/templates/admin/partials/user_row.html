@@ -41,6 +41,7 @@
       {% include "partials/csrf_field.html" %}
       <button type="submit" class="admin-btn admin-btn--danger admin-btn--small">Delete</button>
     </form>
+    <a href="/admin/users/{{ u.id }}/username" class="admin-btn-link">Username</a>
     <a href="/admin/users/{{ u.id }}/password" class="admin-btn-link">Password</a>
     {% endif %}
     </div>

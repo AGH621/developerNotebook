@@ -112,6 +112,12 @@ def test_login_page_has_browse_as_guest(client: TestClient, guest_user: User):
     assert b"Browse as guest" in r.content
 
 
+def test_guest_cannot_change_username(guest_client: TestClient):
+    r = guest_client.get("/change-username", follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers.get("location") == "/"
+
+
 def test_password_login_rejects_guest_account(client: TestClient, guest_user: User):
     r = client.post(
         "/login",

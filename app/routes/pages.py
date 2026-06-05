@@ -34,7 +34,7 @@ from app.invite_requests import (
 )
 from app.rate_limit import limiter
 from app.models import Invitation, InvitationRequest, Section, Topic, User
-from app.validation import MAX_USERNAME, truncate
+from app.validation import MAX_USERNAME, normalize_username, validate_username
 from app.routes.sections import _topic_context_flags
 from app.services.guest import guest_topic_by_slug, guest_visible_topics, sorted_starter_sections
 from app.services.seed import (
@@ -583,11 +583,16 @@ async def register_post(
             status_code=status_cd,
         )
 
-    name = truncate(username, MAX_USERNAME)
+    name = normalize_username(username)
     code_value = (invite_code or "").strip()
     if not name or not password:
         auth_log.warning("Registration rejected empty username or password")
         return _invite_error_response("Username and password are required.", status_cd=status.HTTP_400_BAD_REQUEST)
+
+    name_err = validate_username(name)
+    if name_err:
+        auth_log.warning("Registration rejected invalid username=%s", name)
+        return _invite_error_response(name_err, status_cd=status.HTTP_400_BAD_REQUEST)
 
     invitation = db.scalars(
         select(Invitation).where(
@@ -874,6 +879,121 @@ async def change_password_post(
     )
     create_session(response, user, db)
     return response
+
+
+@router.get("/change-username")
+async def change_username_get(
+    request: Request,
+    user: User = Depends(require_auth),
+):
+    """Show the change-username form for the logged-in user."""
+    if user.is_guest:
+        return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+    ok = request.query_params.get("ok")
+    return templates.TemplateResponse(
+        request,
+        "change_username.html",
+        {
+            "user": user,
+            "error": None,
+            "success": ok == "1",
+            "max_username": MAX_USERNAME,
+            "new_username": None,
+        },
+    )
+
+
+@router.post("/change-username")
+@limiter.limit("5/minute")
+async def change_username_post(
+    request: Request,
+    user: User = Depends(require_can_write),
+    db: Session = Depends(get_db),
+    current_password: Annotated[str, Form()] = "",
+    new_username: Annotated[str, Form()] = "",
+):
+    """Update the logged-in user's username after verifying their password."""
+    name = normalize_username(new_username)
+    ctx = {
+        "user": user,
+        "error": None,
+        "success": False,
+        "max_username": MAX_USERNAME,
+        "new_username": name,
+    }
+
+    if not current_password or not name:
+        ctx["error"] = "Password and new username are required."
+        return templates.TemplateResponse(
+            request,
+            "change_username.html",
+            ctx,
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not verify_password(current_password, user.password_hash):
+        auth_log.warning("Change username failed bad current password user_id=%s", user.id)
+        ctx["error"] = "Current password is incorrect."
+        return templates.TemplateResponse(
+            request,
+            "change_username.html",
+            ctx,
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    if name == user.username:
+        ctx["error"] = "Choose a different username."
+        return templates.TemplateResponse(
+            request,
+            "change_username.html",
+            ctx,
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    name_err = validate_username(name)
+    if name_err:
+        ctx["error"] = name_err
+        return templates.TemplateResponse(
+            request,
+            "change_username.html",
+            ctx,
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    taken = db.scalars(select(User).where(User.username == name)).first()
+    if taken is not None:
+        ctx["error"] = "That username is already taken."
+        return templates.TemplateResponse(
+            request,
+            "change_username.html",
+            ctx,
+            status_code=status.HTTP_409_CONFLICT,
+        )
+
+    old_name = user.username
+    user.username = name
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        ctx["error"] = "That username is already taken."
+        return templates.TemplateResponse(
+            request,
+            "change_username.html",
+            ctx,
+            status_code=status.HTTP_409_CONFLICT,
+        )
+
+    auth_log.info(
+        "Username changed user_id=%s old=%s new=%s",
+        user.id,
+        old_name,
+        name,
+    )
+    return RedirectResponse(
+        url="/change-username?ok=1",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
 
 
 @router.get("/delete-account")

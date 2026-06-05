@@ -11,6 +11,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import case, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth import hash_password, require_admin, validate_password
@@ -32,6 +33,7 @@ from app.settings import (
 )
 from app.slug import allocate_starter_topic_slug
 from app.templating import invite_register_url, templates
+from app.validation import MAX_USERNAME, normalize_username, validate_username
 
 # include_in_schema=False hides routes from the OpenAPI document only; every path
 # still enforces auth via require_admin — it is not an access-control mechanism.
@@ -284,6 +286,107 @@ async def admin_password_set(
     db.commit()
     admin_log.info("admin=%s reset password user_id=%s", admin_user.id, target.id)
     ok = quote(f"Password updated for {target.username}.")
+    return RedirectResponse(url="/admin?ok=" + ok, status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/users/{user_id}/username", include_in_schema=False)
+async def admin_username_form(
+    request: Request,
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(require_admin),
+):
+    target = db.get(User, user_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target.is_guest:
+        return RedirectResponse(
+            url="/admin?error=" + quote("The guest account cannot be renamed."),
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    qp_error = request.query_params.get("error")
+    return templates.TemplateResponse(
+        request,
+        "admin/username_form.html",
+        {
+            "user": admin_user,
+            "target_user": target,
+            "error": qp_error,
+            "max_username": MAX_USERNAME,
+            "new_username": None,
+        },
+    )
+
+
+@router.post("/users/{user_id}/username", include_in_schema=False)
+async def admin_username_set(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(require_admin),
+    new_username: Annotated[str | None, Form()] = None,
+):
+    target = db.get(User, user_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if target.is_guest:
+        err = quote("The guest account cannot be renamed.")
+        return RedirectResponse(
+            url="/admin?error=" + err,
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    name = normalize_username(new_username)
+    if not name:
+        err = quote("Username cannot be empty.")
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/username?error={err}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    if name == target.username:
+        err = quote("Choose a different username.")
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/username?error={err}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    name_err = validate_username(name)
+    if name_err:
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/username?error={quote(name_err)}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    taken = db.scalars(select(User).where(User.username == name)).first()
+    if taken is not None:
+        err = quote("That username is already taken.")
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/username?error={err}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    old_name = target.username
+    target.username = name
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        err = quote("That username is already taken.")
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/username?error={err}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    admin_log.info(
+        "admin=%s renamed user_id=%s old=%s new=%s",
+        admin_user.id,
+        target.id,
+        old_name,
+        name,
+    )
+    ok = quote(f"Username updated for {old_name} → {name}.")
     return RedirectResponse(url="/admin?ok=" + ok, status_code=status.HTTP_303_SEE_OTHER)
 
 

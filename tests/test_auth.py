@@ -184,9 +184,11 @@ def test_nav_user_menu_links(authenticated_client: TestClient):
     assert r.status_code == 200
     assert b"site-nav__user-menu" in r.content
     assert TEST_USERNAME.encode() in r.content
+    assert b'href="/change-username"' in r.content
     assert b'href="/change-password"' in r.content
     assert b'href="/delete-account"' in r.content
     assert b'action="/logout"' in r.content
+    assert b"Change username" in r.content
     assert b"Change password" in r.content
     assert b"Delete account" in r.content
     assert b"Log out" in r.content
@@ -275,6 +277,79 @@ def test_authenticated_topic_slug_accessible(_registered: TestClient, test_db: S
     r = _registered.get(f"/topic/{slug}", follow_redirects=False)
     assert r.status_code == 200
     assert b"Git" in r.content
+
+
+def test_register_rejects_reserved_username(client: TestClient, register_invite: str):
+    r = client.post(
+        "/register",
+        data={"username": "admin", "password": TEST_PASSWORD, "invite_code": register_invite},
+    )
+    assert r.status_code == 400
+    assert b"reserved" in r.content.lower()
+
+
+def test_change_username_requires_auth(client: TestClient):
+    r = client.get("/change-username", follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers.get("location") == "/login"
+
+
+def test_change_username_rejects_wrong_current(authenticated_client: TestClient):
+    r = authenticated_client.post(
+        "/change-username",
+        data={"current_password": "wrong", "new_username": "renamed-user"},
+    )
+    assert r.status_code == 401
+    assert b"incorrect" in r.content.lower()
+
+
+def test_change_username_rejects_reserved(authenticated_client: TestClient):
+    r = authenticated_client.post(
+        "/change-username",
+        data={"current_password": TEST_PASSWORD, "new_username": "administrator"},
+    )
+    assert r.status_code == 400
+    assert b"reserved" in r.content.lower()
+
+
+def test_change_username_rejects_duplicate(
+    authenticated_client: TestClient,
+    test_db: Session,
+):
+    test_db.add(User(username="taken-name", password_hash=hash_password("other-pw-9")))
+    test_db.commit()
+    r = authenticated_client.post(
+        "/change-username",
+        data={"current_password": TEST_PASSWORD, "new_username": "taken-name"},
+    )
+    assert r.status_code == 409
+    assert b"already taken" in r.content.lower()
+
+
+def test_change_username_success(authenticated_client: TestClient, test_db: Session):
+    r = authenticated_client.post(
+        "/change-username",
+        data={"current_password": TEST_PASSWORD, "new_username": "renamed-me"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert r.headers.get("location") == "/change-username?ok=1"
+
+    authenticated_client.post("/logout")
+    assert (
+        authenticated_client.post(
+            "/login",
+            data={"username": TEST_USERNAME, "password": TEST_PASSWORD},
+        ).status_code
+        == 401
+    )
+    r_login = authenticated_client.post(
+        "/login",
+        data={"username": "renamed-me", "password": TEST_PASSWORD},
+    )
+    assert r_login.status_code == 303
+    row = test_db.scalars(select(User).where(User.username == "renamed-me")).one()
+    assert row.username == "renamed-me"
 
 
 def test_change_password_requires_auth(client: TestClient):

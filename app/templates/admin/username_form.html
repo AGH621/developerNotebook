@@ -1,0 +1,21 @@
+{% extends "admin/layout.html" %}
+{% block title %}Admin — Rename user{% endblock %}
+{% block admin_nav_users %}admin-tabs__link--active{% endblock %}
+{% block admin_body %}
+<section class="auth-panel admin-password-panel">
+  <h1>Rename · {{ target_user.username }}</h1>
+  {% if error %}
+  <p class="auth-panel__error" role="alert">{{ error }}</p>
+  {% endif %}
+  <p class="admin-lede">The user does not need their password. Choose a new login name (up to {{ max_username }} characters).</p>
+  <form method="post" action="/admin/users/{{ target_user.id }}/username" class="auth-form">
+    {% include "partials/csrf_field.html" %}
+    <label class="auth-form__field">
+      <span>New username</span>
+      <input name="new_username" type="text" required autocomplete="off" maxlength="{{ max_username }}" value="{{ new_username or target_user.username }}">
+    </label>
+    <button type="submit" class="auth-form__submit">Save username</button>
+  </form>
+  <p class="auth-panel__footer"><a href="/admin">Back to admin</a></p>
+</section>
+{% endblock %}

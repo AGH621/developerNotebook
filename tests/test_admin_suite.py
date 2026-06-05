@@ -301,3 +301,42 @@ def test_admin_password_reset(client: TestClient, test_db: Session):
     test_db.expire_all()
     row = test_db.scalars(select(User).where(User.id == uid)).one()
     assert verify_password("fresh-new-strong", row.password_hash)
+
+
+def test_admin_username_rename(client: TestClient, test_db: Session):
+    _admin_login(client, test_db)
+    test_db.add(User(username="subj2", password_hash=hash_password("old-old"), is_admin=False))
+    test_db.commit()
+    uid = test_db.scalars(select(User.id).where(User.username == "subj2")).one()
+    rsp = client.post(
+        f"/admin/users/{uid}/username",
+        data={"new_username": "renamed-by-admin"},
+        follow_redirects=False,
+    )
+    assert rsp.status_code == 303
+    test_db.expire_all()
+    row = test_db.scalars(select(User).where(User.id == uid)).one()
+    assert row.username == "renamed-by-admin"
+
+
+def test_admin_cannot_rename_guest(client: TestClient, test_db: Session):
+    from app.bootstrap import DEFAULT_GUEST_USERNAME
+
+    _admin_login(client, test_db)
+    guest = User(
+        username=DEFAULT_GUEST_USERNAME,
+        password_hash=hash_password("guest-secret"),
+        is_guest=True,
+    )
+    test_db.add(guest)
+    test_db.commit()
+    gid = test_db.scalars(select(User.id).where(User.is_guest.is_(True))).one()
+    rsp = client.post(
+        f"/admin/users/{gid}/username",
+        data={"new_username": "not-guest"},
+        follow_redirects=False,
+    )
+    assert rsp.status_code == 303
+    assert "error=" in (rsp.headers.get("location") or "")
+    test_db.expire_all()
+    assert test_db.scalars(select(User.username).where(User.id == gid)).one() == DEFAULT_GUEST_USERNAME
