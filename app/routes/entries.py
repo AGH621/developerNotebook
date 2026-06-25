@@ -91,7 +91,10 @@ async def create_entry(
     entry = Entry(section_id=section_id, description=desc, command=cmd, display_order=slot)
     db.add(entry)
     db.flush()
-    fts_insert(db, entry.id, desc, cmd)
+    try:
+        fts_insert(db, entry.id, desc, cmd)
+    except Exception:
+        entries_log.warning("FTS insert failed for entry_id=%s, skipping", entry.id, exc_info=True)
     db.commit()
     db.refresh(entry)
     entries_log.info(
@@ -300,7 +303,10 @@ async def update_entry(
     new_cmd = truncate(command, MAX_ENTRY_COMMAND)
     entry.description = new_desc
     entry.command = new_cmd
-    fts_update(db, entry.id, old_desc, old_cmd, new_desc, new_cmd)
+    try:
+        fts_update(db, entry.id, old_desc, old_cmd, new_desc, new_cmd)
+    except Exception:
+        entries_log.warning("FTS update failed for entry_id=%s, skipping", entry.id, exc_info=True)
     db.commit()
     db.refresh(entry)
     entries_log.info("Entry updated id=%s user_id=%s", entry_id, user.id)
@@ -342,7 +348,10 @@ async def delete_entry(
         )
         return Response(status_code=404)
     sid = entry.section_id
-    fts_delete(db, entry.id, entry.description, entry.command)
+    try:
+        fts_delete(db, entry.id, entry.description, entry.command)
+    except Exception:
+        entries_log.warning("FTS delete failed for entry_id=%s, skipping", entry.id, exc_info=True)
     db.delete(entry)
     db.commit()
     entries_log.info("Entry deleted id=%s section_id=%s user_id=%s", entry_id, sid, user.id)

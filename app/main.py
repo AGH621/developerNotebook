@@ -19,7 +19,7 @@ load_dotenv(_PROJECT_ROOT / ".env")
 
 from app.bootstrap import run_startup_tasks
 from app.database import Base, SessionLocal, apply_sqlite_user_column_migrations, engine
-from app.indexing import ensure_fts_table
+from app.indexing import ensure_fts_table, fts_rebuild
 
 logging.basicConfig(
     level=getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), logging.INFO),
@@ -80,12 +80,14 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         run_startup_tasks(db)
+        fts_rebuild(db)
         db.commit()
     except BaseException:
         db.rollback()
         raise
     finally:
         db.close()
+    logger.info("FTS index rebuilt.")
     yield
 
 
